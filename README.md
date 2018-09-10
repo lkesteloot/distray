@@ -100,9 +100,9 @@ The order of execution is:
 
 1. Perform the "in" copies that don't include a frame number.
 2. For each frame:
-  1. Perform the "in" copies that include a frame number.
-  2. Execute the binary.
-  3. Perform the "out" copies that include a frame number.
+   1. Perform the "in" copies that include a frame number.
+   2. Execute the binary.
+   3. Perform the "out" copies that include a frame number.
 3. Perform the "out" copies that don't include a frame number.
 
 # Examples
