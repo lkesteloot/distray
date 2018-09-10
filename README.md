@@ -96,6 +96,20 @@ where `N` is a positive decimal integer, then the copy will be performed every
 frame. Otherwise it will be performed at the beginning or end of the entire
 process.
 
+The order of execution is:
+
+1. Perform the "in" copies that don't include a frame number.
+
+2. For each frame:
+
+  1. Perform the "in" copies that include a frame number.
+
+  2. Execute the binary.
+
+  3. Perform the "out" copies that include a frame number.
+
+3. Perform the "out" copies that don't include a frame number.
+
 # Examples
 
 You can run distrend with and without a proxy.
