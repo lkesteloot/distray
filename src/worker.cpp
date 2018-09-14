@@ -8,6 +8,7 @@
 
 #include "worker.hpp"
 #include "Drp.pb.h"
+#include "util.hpp"
 
 static void fatal(const char *func, int rv)
 {
@@ -28,13 +29,10 @@ int start_worker(const Parameters &parameters) {
         fatal("nng_dial", rv);
     }
     for (;;) {
-        char *buf = NULL;
-        size_t size;
-        if ((rv = nng_recv(sock, &buf, &size, NNG_FLAG_ALLOC)) != 0) {
-            fatal("nng_recv", rv);
+        rv = receive_message(sock, request);
+        if (rv != 0) {
+            fatal("receive_message", rv);
         }
-        request.ParseFromArray(buf, size);
-        nng_free(buf, size);
 
         std::cout << "Received " << request.request_type() << "\n";
 
@@ -47,13 +45,10 @@ int start_worker(const Parameters &parameters) {
         }
         welcome_response->set_hostname(hostname);
         welcome_response->set_core_count(std::thread::hardware_concurrency());
-        size = response.ByteSize();
-        buf = (char *) nng_alloc(size);
-        response.SerializeToArray(buf, size);
 
-        rv = nng_send(sock, buf, size, NNG_FLAG_ALLOC);
+        rv = send_message(sock, response);
         if (rv != 0) {
-            fatal("nng_send", rv);
+            fatal("send_message", rv);
         }
     }
 

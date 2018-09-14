@@ -7,6 +7,7 @@
 
 #include "controller.hpp"
 #include "Drp.pb.h"
+#include "util.hpp"
 
 static void fatal(const char *func, int rv)
 {
@@ -17,7 +18,6 @@ static void fatal(const char *func, int rv)
 int start_controller(const Parameters &parameters) {
     nng_socket sock;
     int rv;
-    char *buf = NULL;
     Drp::Request request;
     Drp::Response response;
 
@@ -29,20 +29,15 @@ int start_controller(const Parameters &parameters) {
     }
 
     request.set_request_type(Drp::WELCOME);
-
-    size_t size = request.ByteSize();
-    buf = (char *) nng_alloc(size);
-    request.SerializeToArray(buf, size);
-    if ((rv = nng_send(sock, &request, sizeof(request), 0)) != 0) {
-        fatal("nng_send", rv);
+    rv = send_message(sock, request);
+    if (rv != 0) {
+        fatal("send_message", rv);
     }
-    nng_free(buf, size);
 
-    if ((rv = nng_recv(sock, &buf, &size, NNG_FLAG_ALLOC)) != 0) {
-        fatal("nng_recv", rv);
+    rv = receive_message(sock, response);
+    if (rv != 0) {
+        fatal("receive_message", rv);
     }
-    response.ParseFromArray(buf, size);
-    nng_free(buf, size);
 
     if (request.request_type() == Drp::WELCOME) {
         std::cout << "hostname: " << response.welcome_response().hostname() <<
