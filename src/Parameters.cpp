@@ -1,6 +1,7 @@
 
 #include <deque>
 #include <stdexcept>
+#include <cstring>
 
 #include "Parameters.hpp"
 
