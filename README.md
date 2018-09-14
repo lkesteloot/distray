@@ -6,11 +6,17 @@ for non-rendering batch tasks.
 
 # Compiling
 
-Compile distrend using the Makefile:
+Build distrend using CMake:
 
+    % mkdir build
+    % cd build
+    % cmake ..
     % make
 
-It compiles on MacOS and Linux.
+It compiles on MacOS and Linux. You'll need the protobuf compiler
+and library:
+
+    % sudo apt-get install protobuf-compiler libprotobuf-dev
 
 # Running
 
