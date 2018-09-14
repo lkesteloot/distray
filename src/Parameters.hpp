@@ -38,7 +38,7 @@ public:
     // For all commands.
     std::string m_password;
 
-    // For CMD_WORKER.
+    // For CMD_WORKER (outgoing); and CMD_PROXY and CMD_CONTROLLER (incoming).
     std::string m_url;
 
     // For CMD_PROXY.

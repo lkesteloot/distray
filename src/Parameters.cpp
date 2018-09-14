@@ -58,14 +58,19 @@ public:
 // Prints program usage to standard error.
 void Parameters::usage() const {
     std::cerr << "Usage: distrend {worker,proxy,controller} [FLAGS] [ARGUMENTS]\n";
+    std::cerr << "\n";
     std::cerr << "Commands:\n";
+    std::cerr << "\n";
     std::cerr << "    worker [FLAGS] URL\n";
     std::cerr << "        The URL of either a proxy or a controller (tcp://HOSTNAME:PORT).\n";
     std::cerr << "        --password PASSWORD Password to pass to proxies or the controller.\n";
     std::cerr << "                   Defaults to an empty string.\n";
+    std::cerr << "\n";
     std::cerr << "    proxy [FLAGS]\n";
-    std::cerr << "        --password PASSWORD Password to expect from workers or the controller.\n";
-    std::cerr << "                   Defaults to an empty string.\n";
+    std::cerr << "        --password     PASSWORD Password to expect from workers or the\n";
+    std::cerr << "                       controller. Defaults to an empty string.\n";
+    std::cerr << "        --listen URL   URL to listen on [tcp://0.0.0.0:1120].\n";
+    std::cerr << "\n";
     std::cerr << "    controller [FLAGS] FRAMES EXEC [PARAMETERS...]\n";
     std::cerr << "        FRAMES is a frame range specification: FIRST[,LAST[,STEP]],\n";
     std::cerr << "        where STEP defaults to 1 or -1 (depending on order of FIRST and LAST)\n";
@@ -79,6 +84,7 @@ void Parameters::usage() const {
     std::cerr << "        --out REMOTE LOCAL  Copy REMOTE file to LOCAL file. Can be repeated.\n";
     std::cerr << "        --password PASSWORD Password to expect from workers or to pass\n";
     std::cerr << "                            to proxies. Defaults to an empty string.\n";
+    std::cerr << "        --listen URL        URL to listen on [tcp://0.0.0.0:1120].\n";
 }
 
 // Fills parameters and returns 0 on success; otherwise returns program exit status.
@@ -108,6 +114,12 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
     } else {
         std::cerr << "Command must be the first parameter.\n";
         return 1;
+    }
+
+    // Default value for incoming URL.
+    if (m_command == CMD_PROXY || m_command == CMD_CONTROLLER) {
+        // Listen on all IPv4 interfaces.
+        m_url = "tcp://0.0.0.0:1120";
     }
 
     while (args.next_is_flag()) {
@@ -145,6 +157,17 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
                 copies.push_back(FileCopy(source, destination));
             } else {
                 std::cerr << "Must specify two pathnames with " << arg << " flag.\n";
+                return 1;
+            }
+        } else if (arg == "--listen") {
+            if (m_command == CMD_WORKER) {
+                std::cerr << "The --listen flag is not valid for the worker command.\n";
+                return 1;
+            }
+            if (args.has_at_least(1)) {
+                m_url = args.next();
+            } else {
+                std::cerr << "Must specify listen URL with --listen flag.\n";
                 return 1;
             }
         } else {

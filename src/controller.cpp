@@ -24,7 +24,7 @@ int start_controller(const Parameters &parameters) {
     if ((rv = nng_req0_open(&sock)) != 0) {
         fatal("nng_socket", rv);
     }
-    if ((rv = nng_listen(sock, "tcp://127.0.0.1:1120", NULL, 0)) != 0) {
+    if ((rv = nng_listen(sock, parameters.m_url.c_str(), NULL, 0)) != 0) {
         fatal("nng_listen", rv);
     }
 
