@@ -39,14 +39,13 @@ public:
     std::string m_password;
 
     // For CMD_WORKER.
-    std::string m_hostname;
-    int m_port;
+    std::string m_url;
 
     // For CMD_PROXY.
     // (None.)
 
     // For CMD_CONTROLLER.
-    std::vector<std::string> m_proxies;
+    std::vector<std::string> m_proxy_urls;
     std::vector<FileCopy> m_in_copies;
     std::vector<FileCopy> m_out_copies;
     Frames m_frames;
@@ -54,20 +53,13 @@ public:
     std::vector<std::string> m_arguments;
 
     Parameters()
-        : m_command(CMD_UNSPECIFIED), m_port(DEFAULT_PORT) {
+        : m_command(CMD_UNSPECIFIED) {
 
         // Nothing.
     }
 
     void usage() const;
     int parse_arguments(int argc, char *argv[]);
-
-private:
-    // Parses the string into a "host:port" pair, storing the results
-    // in the m_hostname and m_port fields. The host is optional. Returns
-    // whether successful. Does not validate that a hostname has the valid
-    // syntax.
-    bool parse_host_and_port(const std::string &host_and_port);
 };
 
 #endif // PARAMETERS_HPP

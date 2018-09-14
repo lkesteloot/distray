@@ -6,6 +6,14 @@ for non-rendering batch tasks.
 
 # Compiling
 
+You'll need the protobuf compiler and library:
+
+    % sudo apt-get install protobuf-compiler libprotobuf-dev
+
+If the `nng` directory is empty, fill it out with this command:
+
+    % git submodule update --init --recursive
+
 Build distrend using CMake:
 
     % mkdir build
@@ -13,10 +21,7 @@ Build distrend using CMake:
     % cmake ..
     % make
 
-It compiles on MacOS and Linux. You'll need the protobuf compiler
-and library:
-
-    % sudo apt-get install protobuf-compiler libprotobuf-dev
+It compiles on MacOS and Linux.
 
 # Running
 

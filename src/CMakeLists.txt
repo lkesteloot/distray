@@ -22,11 +22,17 @@ set(SOURCES ${SOURCES} ${PROTO_SRCS})
 add_executable(distrend ${SOURCES})
 
 # What to link with.
-target_link_libraries(distrend pthread ${PROTOBUF_LIBRARIES})
+target_link_libraries(distrend nng pthread ${PROTOBUF_LIBRARIES})
 
 # We need these C++ features.
 target_compile_features(distrend PRIVATE cxx_long_long_type)
 
 # Look for the standard protobuf headers, as well as the one we generated.
-target_include_directories(distrend PRIVATE ${PROTOBUF_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(distrend PRIVATE
+    ${PROTOBUF_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_BINARY_DIR}
+# This gross hack is because we want to include <nng/nng.h>, but the include
+# files in the source tree aren't under an "nng" directory. So we make a symbolic
+# link from include/nng to nng/src and then specify "include" explicitly.
+    ${distrend_root_SOURCE_DIR}/include)
 

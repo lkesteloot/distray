@@ -59,9 +59,8 @@ public:
 void Parameters::usage() const {
     std::cerr << "Usage: distrend {worker,proxy,controller} [FLAGS] [ARGUMENTS]\n";
     std::cerr << "Commands:\n";
-    std::cerr << "    worker [FLAGS] HOST[:PORT]\n";
-    std::cerr << "        The HOST is the hostname of either a proxy or a controller.\n";
-    std::cerr << "        The PORT defaults to 1120.\n";
+    std::cerr << "    worker [FLAGS] URL\n";
+    std::cerr << "        The URL of either a proxy or a controller (tcp://HOSTNAME:PORT).\n";
     std::cerr << "        --password PASSWORD Password to pass to proxies or the controller.\n";
     std::cerr << "                   Defaults to an empty string.\n";
     std::cerr << "    proxy [FLAGS]\n";
@@ -75,7 +74,7 @@ void Parameters::usage() const {
     std::cerr << "        PARAMETERS are the parameters to pass to the executed binary.\n";
     std::cerr << "        Use %d or %0Nd for the frame number, where N is a positive\n";
     std::cerr << "        decimal integer that specifies field width.\n";
-    std::cerr << "        --proxy HOST        Proxy to connect to. Can be repeated.\n";
+    std::cerr << "        --proxy URL         Proxy URL to connect to. Can be repeated.\n";
     std::cerr << "        --in LOCAL REMOTE   Copy LOCAL file to REMOTE file. Can be repeated.\n";
     std::cerr << "        --out REMOTE LOCAL  Copy REMOTE file to LOCAL file. Can be repeated.\n";
     std::cerr << "        --password PASSWORD Password to expect from workers or to pass\n";
@@ -127,9 +126,9 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
                 return 1;
             }
             if (args.has_at_least(1)) {
-                m_proxies.push_back(args.next());
+                m_proxy_urls.push_back(args.next());
             } else {
-                std::cerr << "Must specify proxy with --proxy flag.\n";
+                std::cerr << "Must specify proxy URL with --proxy flag.\n";
                 return 1;
             }
         } else if (arg == "--in" || arg == "--out") {
@@ -157,12 +156,9 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
     // Parse non-flag parameters.
     if (m_command == CMD_WORKER) {
         if (args.has_exactly(1)) {
-            bool success = parse_host_and_port(args.next());
-            if (!success) {
-                return 1;
-            }
+            m_url = args.next();
         } else {
-            std::cerr << "The worker command must specify the host to connect to.\n";
+            std::cerr << "The worker command must specify the URL to connect to.\n";
             return 1;
         }
     } else if (m_command == CMD_PROXY) {
@@ -192,31 +188,5 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
     }
 
     return 0;
-}
-
-bool Parameters::parse_host_and_port(const std::string &host_and_port) {
-    const char *s = host_and_port.c_str();
-    const char *c = strchr(s, ':');
-    if (c == nullptr) {
-        m_hostname = s;
-        // Leave port untouched.
-    } else {
-        char *endptr;
-
-        m_hostname = std::string(s, c - s);
-        m_port = (int) strtol(c + 1, &endptr, 10);
-
-        if (*endptr != '\0') {
-            std::cerr << "Invalid port in hostname specification: " << (c + 1) << "\n";
-            return false;
-        }
-    }
-
-    if (m_hostname.empty()) {
-        std::cerr << "Cannot have empty hostname.\n";
-        return false;
-    }
-
-    return true;
 }
 
