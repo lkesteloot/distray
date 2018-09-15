@@ -218,6 +218,10 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
 
         // Main executable name.
         m_executable = args.next();
+        if (!is_pathname_local(m_executable)) {
+            std::cerr << "Executable must be local: " << m_executable << "\n";
+            return 1;
+        }
 
         // Eat up the rest.
         args.fill_from_rest(m_arguments);
