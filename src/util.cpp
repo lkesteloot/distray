@@ -1,6 +1,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <iomanip>
 #include <stdexcept>
 
 #include "util.hpp"
@@ -37,8 +38,8 @@ int receive_message(nng_socket sock, google::protobuf::Message &response) {
 // The width is zero in the "%d" case or N in the "%0Nd" case. Returns whether
 // a parameter was found. The begin, end, and width parameters may be destroyed
 // even if the return value is false.
-static bool find_pathname_parameter(const std::string &pathname, int &begin, int &end, int &width) {
-    const char *s = pathname.c_str();
+static bool find_parameter(const std::string &str, int &begin, int &end, int &width) {
+    const char *s = str.c_str();
     const char *p = s;
 
     while (true) {
@@ -69,15 +70,33 @@ static bool find_pathname_parameter(const std::string &pathname, int &begin, int
     }
 }
 
-bool pathname_has_parameter(const std::string &pathname) {
+bool has_parameter(const std::string &str) {
     int begin, end, width;
 
-    return find_pathname_parameter(pathname, begin, end, width);
+    return find_parameter(str, begin, end, width);
 }
 
-// Substitute a parameter ("%d" or "%0Nd") into the pathname.
-std::string substitute_pathname_parameter(const std::string &pathname, int value) {
-    return "not_done";
+// Substitute a parameter ("%d" or "%0Nd") into the string.
+std::string substitute_parameter(const std::string &str, int value) {
+    int begin, end, width;
+
+    // See if we have any parameters.
+    if (find_parameter(str, begin, end, width)) {
+        // Convert value to a string, the hard C++ way.
+        std::stringstream value_stream;
+        if (width == 0) {
+            value_stream << value;
+        } else {
+            value_stream << std::setfill('0') << std::setw(width) << value;
+        }
+        std::string value_str = value_stream.str();
+
+        // Recurse to do the rest of the string.
+        return str.substr(0, begin) + value_str + substitute_parameter(str.substr(end), value);
+    } else {
+        // No parameters, return string unchanged.
+        return str;
+    }
 }
 
 bool is_pathname_local(const std::string &pathname) {
