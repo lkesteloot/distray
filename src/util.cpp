@@ -81,7 +81,7 @@ std::string substitute_parameter(const std::string &str, int value) {
     int begin, end, width;
 
     // See if we have any parameters.
-    if (find_parameter(str, begin, end, width)) {
+    if (value >= 0 && find_parameter(str, begin, end, width)) {
         // Convert value to a string, the hard C++ way.
         std::stringstream value_stream;
         if (width == 0) {
@@ -94,7 +94,7 @@ std::string substitute_parameter(const std::string &str, int value) {
         // Recurse to do the rest of the string.
         return str.substr(0, begin) + value_str + substitute_parameter(str.substr(end), value);
     } else {
-        // No parameters, return string unchanged.
+        // No parameters or negative value, return string unchanged.
         return str;
     }
 }

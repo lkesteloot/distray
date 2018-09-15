@@ -48,6 +48,7 @@ static std::vector<SubstituteParameter> m_substitute_parameter {
     { "", 0, "" },
     { "no parameter", 0, "no parameter" },
     { "%d", 123, "123" },
+    { "%d", -1, "%d" },
     { "%05d", 123, "00123" },
     { "abc%ddef", 123, "abc123def" },
     { "abc%05ddef", 123, "abc00123def" },

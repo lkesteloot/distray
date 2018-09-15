@@ -14,7 +14,8 @@ int receive_message(nng_socket sock, google::protobuf::Message &response);
 // Whether a string includes a parameter ("%d" or "%0Nd").
 bool has_parameter(const std::string &str);
 
-// Substitute a parameter ("%d" or "%0Nd") into the string.
+// Substitute a parameter ("%d" or "%0Nd") into the string. Does no
+// expansion if the value is negative.
 std::string substitute_parameter(const std::string &str, int value);
 
 // Check whether a pathname is local (relative and can't escape the current directory).

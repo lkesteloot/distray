@@ -25,11 +25,9 @@ static bool copy_in(nng_socket sock, const Parameters &parameters, int frame) {
 
             request.set_request_type(Drp::COPY_IN);
             Drp::CopyInRequest *copy_in_request = request.mutable_copy_in_request();
-            // XXX expand %d and %0Nd.
-            copy_in_request->set_pathname(fileCopy.m_destination);
+            copy_in_request->set_pathname(substitute_parameter(fileCopy.m_destination, frame));
             try {
-                // XXX expand %d and %0Nd.
-                copy_in_request->set_content(read_file(fileCopy.m_source));
+                copy_in_request->set_content(read_file(substitute_parameter(fileCopy.m_source, frame)));
             } catch (std::runtime_error e) {
                 std::cerr << "Error reading file " << fileCopy.m_source << "\n";
                 return -1;
@@ -67,8 +65,7 @@ static bool copy_out(nng_socket sock, const Parameters &parameters, int frame) {
 
             request.set_request_type(Drp::COPY_OUT);
             Drp::CopyOutRequest *copy_out_request = request.mutable_copy_out_request();
-            // XXX expand %d and %0Nd.
-            copy_out_request->set_pathname(fileCopy.m_source);
+            copy_out_request->set_pathname(substitute_parameter(fileCopy.m_source, frame));
             int rv = send_message(sock, request);
             if (rv != 0) {
                 fatal("send_message", rv);
@@ -85,8 +82,7 @@ static bool copy_out(nng_socket sock, const Parameters &parameters, int frame) {
                     return false;
                 }
 
-                // XXX expand %d and %0Nd.
-                bool success = write_file(fileCopy.m_destination, response.copy_out_response().content());
+                bool success = write_file(substitute_parameter(fileCopy.m_destination, frame), response.copy_out_response().content());
                 if (!success) {
                     std::cout << "Could not write local file " << fileCopy.m_destination << "\n";
                     return false;
@@ -158,8 +154,7 @@ int start_controller(const Parameters &parameters) {
             Drp::ExecuteRequest *execute_request = request.mutable_execute_request();
             execute_request->set_executable(parameters.m_executable);
             for (std::string argument : parameters.m_arguments) {
-                // XXX expand %d and %0Nd.
-                execute_request->add_argument(argument);
+                execute_request->add_argument(substitute_parameter(argument, frame));
             }
             rv = send_message(sock, request);
             if (rv != 0) {
