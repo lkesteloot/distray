@@ -7,7 +7,7 @@ struct HasPathname {
     bool m_expected;
 };
 
-static HasPathname m_has_pathname[] = {
+static std::vector<HasPathname> m_has_pathname = {
     { "image.png", false },
     { "image-%d.png", true },
     { "image-%03d.png", true },
@@ -18,9 +18,7 @@ static HasPathname m_has_pathname[] = {
 };
 
 static int test_pathnames() {
-    for (int i = 0; i < sizeof(m_has_pathname)/sizeof(m_has_pathname[0]); i++) {
-        const HasPathname &hp = m_has_pathname[i];
-
+    for (HasPathname &hp : m_has_pathname) {
         std::cerr << hp.m_pathname << ": ";
 
         bool actual = pathname_has_parameter(hp.m_pathname);
