@@ -17,4 +17,7 @@ bool pathname_has_parameter(const std::string &pathname);
 // Substitute a parameter ("%d" or "%0Nd") into the pathname.
 std::string substitute_pathname_parameter(const std::string &pathname, int value);
 
+// Check whether a pathname is local (relative and can't escape the current directory).
+bool is_pathname_local(const std::string &pathname);
+
 #endif // UTIL_HPP

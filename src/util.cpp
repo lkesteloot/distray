@@ -76,3 +76,17 @@ bool pathname_has_parameter(const std::string &pathname) {
 std::string substitute_pathname_parameter(const std::string &pathname, int value) {
     return "not_done";
 }
+
+bool is_pathname_local(const std::string &pathname) {
+    // Can't be absolute.
+    if (pathname.length() > 0 && pathname[0] == '/') {
+        return false;
+    }
+
+    // Can't have parent directories.
+    if (pathname.find("..") != std::string::npos) {
+        return false;
+    }
+
+    return true;
+}

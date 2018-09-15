@@ -155,8 +155,21 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
                 std::string source = args.next();
                 std::string destination = args.next();
 
-                std::vector<FileCopy> &copies = arg == "--in" ? m_in_copies : m_out_copies;
-                copies.push_back(FileCopy(source, destination));
+                std::string remote_pathname;
+                std::vector<FileCopy> *copies;
+                if (arg == "--in") {
+                    remote_pathname = destination;
+                    copies = &m_in_copies;
+                } else {
+                    remote_pathname = source;
+                    copies = &m_out_copies;
+                }
+                if (!is_pathname_local(remote_pathname)) {
+                    std::cerr << "Remote pathname must be local with " << arg << " flag: "
+                        << remote_pathname << "\n";
+                    return 1;
+                }
+                copies->push_back(FileCopy(source, destination));
             } else {
                 std::cerr << "Must specify two pathnames with " << arg << " flag.\n";
                 return 1;
