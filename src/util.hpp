@@ -20,4 +20,10 @@ std::string substitute_pathname_parameter(const std::string &pathname, int value
 // Check whether a pathname is local (relative and can't escape the current directory).
 bool is_pathname_local(const std::string &pathname);
 
+// Read a file into a string. Throws an std::runtime_error exception if there's an I/O error.
+std::string read_file(const std::string &pathname);
+
+// Write a file from a string. Returns whether successful.
+bool write_file(const std::string &pathname, const std::string &content);
+
 #endif // UTIL_HPP

@@ -1,4 +1,8 @@
 
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+
 #include "util.hpp"
 
 int send_message(nng_socket sock, const google::protobuf::Message &request) {
@@ -87,6 +91,30 @@ bool is_pathname_local(const std::string &pathname) {
     if (pathname.find("..") != std::string::npos) {
         return false;
     }
+
+    return true;
+}
+
+std::string read_file(const std::string &pathname) {
+    // This is reasonably efficient.
+    std::ifstream f(pathname);
+    if (!f) {
+        throw std::runtime_error("cannot open file: " + pathname);
+    }
+
+    std::stringstream buffer;
+    buffer << f.rdbuf();
+    return buffer.str();
+}
+
+bool write_file(const std::string &pathname, const std::string &content) {
+    // This is reasonably efficient.
+    std::ofstream f(pathname);
+    if (!f) {
+        return false;
+    }
+
+    f << content;
 
     return true;
 }

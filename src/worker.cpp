@@ -28,6 +28,26 @@ static void handle_welcome(const Drp::WelcomeRequest &request, Drp::WelcomeRespo
     response.set_core_count(std::thread::hardware_concurrency());
 }
 
+static void handle_copy_in(const Drp::CopyInRequest &request, Drp::CopyInResponse &response) {
+    std::string pathname = request.pathname();
+
+    if (!is_pathname_local(pathname)) {
+        // Shouldn't happen, we check this on the controller.
+        std::cerr << "Asked to write to non-local pathname: " << pathname << "\n";
+        response.set_success(false);
+        return;
+    }
+
+    // XXX fail if file exists and is executable.
+
+    bool success = write_file(pathname, request.content());
+    if (!success) {
+        std::cerr << "Failed to write to file: " << pathname << "\n";
+    }
+
+    response.set_success(success);
+}
+
 static void handle_execute(const Drp::ExecuteRequest &request, Drp::ExecuteResponse &response) {
     std::string executable = request.executable();
 
@@ -94,13 +114,17 @@ int start_worker(const Parameters &parameters) {
             fatal("receive_message", rv);
         }
 
-        std::cout << "Received " << request.request_type() << "\n";
         response.set_request_type(request.request_type());
 
         switch (request.request_type()) {
             case Drp::WELCOME:
                 handle_welcome(request.welcome_request(),
                         *response.mutable_welcome_response());
+                break;
+
+            case Drp::COPY_IN:
+                handle_copy_in(request.copy_in_request(),
+                        *response.mutable_copy_in_response());
                 break;
 
             case Drp::EXECUTE:
