@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "Frames.hpp"
+#include "util.hpp"
 
 // Default port we listen to or connect to.
 static const int DEFAULT_PORT = 1120;
@@ -21,11 +22,16 @@ enum Command {
 struct FileCopy {
     std::string m_source;
     std::string m_destination;
+    bool m_source_has_parameter;
+    bool m_destination_has_parameter;
+    bool m_either_has_parameter;
 
     FileCopy(const std::string &source, const std::string &destination)
         : m_source(source), m_destination(destination) {
 
-        // Nothing.
+        m_source_has_parameter = pathname_has_parameter(m_source);
+        m_destination_has_parameter = pathname_has_parameter(m_destination);
+        m_either_has_parameter = m_source_has_parameter || m_destination_has_parameter;
     }
 };
 
