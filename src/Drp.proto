@@ -23,7 +23,7 @@ message ExecuteRequest {
     optional string executable = 1;
 
     // Arguments don't include the executable.
-    repeated string arguments = 2;
+    repeated string argument = 2;
 }
 
 message CopyOutRequest {
