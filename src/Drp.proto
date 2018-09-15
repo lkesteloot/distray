@@ -54,7 +54,7 @@ message ExecuteResponse {
 }
 
 message CopyOutResponse {
-    // If missing, then file wasn't found or wasn't readable.
+    optional bool success = 1;
     optional bytes content = 2;
 }
 

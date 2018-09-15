@@ -9,7 +9,6 @@ int send_message(nng_socket sock, const google::protobuf::Message &request) {
     // Serialize to bytes.
     size_t size = request.ByteSize();
     void *buf = nng_alloc(size);
-    // XXX check result code (a bool, undocumented).
     request.SerializeToArray(buf, size);
 
     // Send.

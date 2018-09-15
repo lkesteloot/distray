@@ -114,6 +114,39 @@ int start_controller(const Parameters &parameters) {
         }
     }
 
+    // Copy files from worker.
+    for (const FileCopy &fileCopy : parameters.m_out_copies) {
+        Drp::Request request;
+        Drp::Response response;
+
+        request.set_request_type(Drp::COPY_OUT);
+        Drp::CopyOutRequest *copy_out_request = request.mutable_copy_out_request();
+        // XXX expand %d and %0Nd.
+        copy_out_request->set_pathname(fileCopy.m_source);
+        rv = send_message(sock, request);
+        if (rv != 0) {
+            fatal("send_message", rv);
+        }
+
+        rv = receive_message(sock, response);
+        if (rv != 0) {
+            fatal("receive_message", rv);
+        }
+
+        if (request.request_type() == Drp::COPY_OUT) {
+            // XXX fail completely if this fails.
+            std::cout << "copy out success: " << response.copy_out_response().success() << "\n";
+            // XXX expand %d and %0Nd.
+            bool success = write_file(fileCopy.m_destination, response.copy_out_response().content());
+            if (!success) {
+                std::cout << "Could not write local file " << fileCopy.m_destination << "\n";
+                // XXX fail.
+            }
+        } else {
+            std::cout << "Got unknown response type " << request.request_type() << "\n";
+        }
+    }
+
     nng_close(sock);
 
     return 0;

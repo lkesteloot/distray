@@ -95,6 +95,27 @@ static void handle_execute(const Drp::ExecuteRequest &request, Drp::ExecuteRespo
     response.set_status(WEXITSTATUS(status));
 }
 
+static void handle_copy_out(const Drp::CopyOutRequest &request, Drp::CopyOutResponse &response) {
+    std::string pathname = request.pathname();
+    std::cout << pathname << "\n";
+
+    if (!is_pathname_local(pathname)) {
+        // Shouldn't happen, we check this on the controller.
+        std::cerr << "Asked to read from non-local pathname: " << pathname << "\n";
+        response.set_success(false);
+        return;
+    }
+
+    try {
+        response.set_content(read_file(pathname));
+        response.set_success(true);
+        std::cerr << "Read from file: " << pathname << "\n";
+    } catch (std::runtime_error e) {
+        std::cerr << "Failed to read from file: " << pathname << "\n";
+        response.set_success(false);
+    }
+}
+
 int start_worker(const Parameters &parameters) {
     nng_socket sock;
     int rv;
@@ -130,6 +151,11 @@ int start_worker(const Parameters &parameters) {
             case Drp::EXECUTE:
                 handle_execute(request.execute_request(),
                         *response.mutable_execute_response());
+                break;
+
+            case Drp::COPY_OUT:
+                handle_copy_out(request.copy_out_request(),
+                        *response.mutable_copy_out_response());
                 break;
 
             default:
