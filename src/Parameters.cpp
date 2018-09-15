@@ -111,6 +111,8 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
         m_command = CMD_PROXY;
     } else if (arg == "controller") {
         m_command = CMD_CONTROLLER;
+    } else if (arg == "unittest") {
+        m_command = CMD_UNITTEST;
     } else {
         std::cerr << "Command must be the first parameter.\n";
         return 1;
@@ -206,6 +208,11 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
 
         // Eat up the rest.
         args.fill_from_rest(m_arguments);
+    } else if (m_command == CMD_UNITTEST) {
+        if (!args.no_more()) {
+            std::cerr << "The unittest command takes no parameters.\n";
+            return 1;
+        }
     } else {
         throw std::logic_error("can't get here");
     }

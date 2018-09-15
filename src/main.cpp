@@ -5,6 +5,7 @@
 #include "worker.hpp"
 #include "proxy.hpp"
 #include "controller.hpp"
+#include "unittest.hpp"
 
 int main(int argc, char **argv) {
     // Parse command-line parameters.
@@ -26,6 +27,10 @@ int main(int argc, char **argv) {
 
         case CMD_CONTROLLER:
             status = start_controller(parameters);
+            break;
+
+        case CMD_UNITTEST:
+            status = start_unittests(parameters);
             break;
 
         case CMD_UNSPECIFIED:

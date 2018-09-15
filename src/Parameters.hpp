@@ -16,6 +16,7 @@ enum Command {
     CMD_WORKER,
     CMD_PROXY,
     CMD_CONTROLLER,
+    CMD_UNITTEST,
 };
 
 // A file copy (in or out).
