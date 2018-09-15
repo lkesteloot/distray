@@ -123,6 +123,10 @@ int start_worker(const Parameters &parameters) {
     if ((rv = nng_rep0_open(&sock)) != 0) {
         fatal("nng_rep0_open", rv);
     }
+    // Raise limit on received message size. We trust senders.
+    if ((rv = nng_setopt_size(sock, NNG_OPT_RECVMAXSZ, 20*1024*1024)) != 0) {
+        fatal("nng_setopt_size", rv);
+    }
     if ((rv = nng_dial(sock, parameters.m_url.c_str(), NULL, 0)) != 0) {
         fatal("nng_dial", rv);
     }

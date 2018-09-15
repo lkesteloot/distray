@@ -16,6 +16,47 @@ static void fatal(const char *func, int rv)
     exit(1);
 }
 
+// Represents a remote worker. Stores our state for it.
+class RemoteWorker {
+public:
+    enum State {
+        INIT,
+    };
+
+    State m_state;
+    nng_aio *m_aio;
+    nng_msg *m_msg;
+    nng_ctx m_ctx;
+
+    RemoteWorker(nng_socket sock)
+        : m_state(INIT), m_msg(nullptr) {
+
+        int rv;
+
+        if ((rv = nng_aio_alloc(&m_aio, callback, this)) != 0) {
+            fatal("nng_aio_alloc", rv);
+        }
+        if ((rv = nng_ctx_open(&m_ctx, sock)) != 0) {
+            fatal("nng_ctx_open", rv);
+        }
+    }
+
+    // Kick off the process.
+    void start() {
+        callback();
+    }
+
+private:
+    static void callback(void *arg) {
+        RemoteWorker *remoteWorker = (RemoteWorker *) arg;
+
+        remoteWorker->callback();
+    }
+
+    void callback() {
+    }
+};
+
 // Returns whether successful.
 static bool copy_in(nng_socket sock, const Parameters &parameters, int frame) {
     for (const FileCopy &fileCopy : parameters.m_in_copies) {
@@ -103,6 +144,10 @@ int start_controller(const Parameters &parameters) {
 
     if ((rv = nng_req0_open(&sock)) != 0) {
         fatal("nng_socket", rv);
+    }
+    // Raise limit on received message size. We trust senders.
+    if ((rv = nng_setopt_size(sock, NNG_OPT_RECVMAXSZ, 20*1024*1024)) != 0) {
+        fatal("nng_setopt_size", rv);
     }
     if ((rv = nng_listen(sock, parameters.m_url.c_str(), NULL, 0)) != 0) {
         fatal("nng_listen", rv);
