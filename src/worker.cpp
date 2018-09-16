@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <cstring>
 #include <errno.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <nng/nng.h>
 #include <nng/protocol/reqrep0/rep.h>
@@ -11,12 +13,6 @@
 #include "worker.hpp"
 #include "Drp.pb.h"
 #include "util.hpp"
-
-static void fatal(const char *func, int rv)
-{
-    fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
-    exit(1);
-}
 
 static void handle_welcome(const Drp::WelcomeRequest &request, Drp::WelcomeResponse &response) {
     char hostname[128];
@@ -117,28 +113,42 @@ static void handle_copy_out(const Drp::CopyOutRequest &request, Drp::CopyOutResp
 }
 
 int start_worker(const Parameters &parameters) {
-    nng_socket sock;
-    int rv;
+    // Create socket.
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        perror("socket");
+        return -1;
+    }
 
-    if ((rv = nng_rep0_open(&sock)) != 0) {
-        fatal("nng_rep0_open", rv);
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(1120);
+    int result = inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+    if (result == -1) {
+        perror("inet_pton");
+        return -1;
+    } else if (result == 0) {
+        std::cerr << "Failed to parse address.\n";
+        return -1;
     }
-    // Raise limit on received message size. We trust senders.
-    if ((rv = nng_setopt_size(sock, NNG_OPT_RECVMAXSZ, 20*1024*1024)) != 0) {
-        fatal("nng_setopt_size", rv);
+
+    result = connect(sockfd, (struct sockaddr *) &addr, sizeof(addr));
+    if (result == -1) {
+        perror("connect");
+        return -1;
     }
-    if ((rv = nng_dial(sock, parameters.m_url.c_str(), NULL, 0)) != 0) {
-        fatal("nng_dial", rv);
-    }
+
     for (;;) {
         Drp::Request request;
         Drp::Response response;
 
-        rv = receive_message(sock, request);
-        if (rv != 0) {
-            fatal("receive_message", rv);
+        result = receive_message_sock(sockfd, request);
+        if (result == -1) {
+            perror("receive_message_sock");
+            return -1;
         }
 
+        std::cout << "Received message " << request.request_type() << "\n";
         response.set_request_type(request.request_type());
 
         switch (request.request_type()) {
@@ -167,9 +177,10 @@ int start_worker(const Parameters &parameters) {
                 break;
         }
 
-        rv = send_message(sock, response);
-        if (rv != 0) {
-            fatal("send_message", rv);
+        result = send_message_sock(sockfd, response);
+        if (result == -1) {
+            perror("send_message_sock");
+            return -1;
         }
     }
 

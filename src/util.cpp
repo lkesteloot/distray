@@ -1,8 +1,10 @@
 
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <stdexcept>
+#include <sys/socket.h>
 
 #include "util.hpp"
 
@@ -31,6 +33,47 @@ int receive_message(nng_socket sock, google::protobuf::Message &response) {
     nng_free(buf, size);
 
     return 0;
+}
+
+int send_message_sock(int sockfd, const google::protobuf::Message &request) {
+    // Serialize to bytes.
+    uint32_t size = request.ByteSize();
+    uint32_t full_size = size + sizeof(size);
+    uint8_t *buf = new uint8_t[full_size];
+    *((uint32_t *) buf) = htonl(size);
+    request.SerializeToArray(buf + sizeof(size), size);
+
+    // Send.
+    int result = send(sockfd, buf, full_size, 0);
+
+    delete[] buf;
+
+    return result;
+}
+
+int receive_message_sock(int sockfd, google::protobuf::Message &response) {
+    uint32_t size;
+
+    // Receive length.
+    int status = recv(sockfd, &size, sizeof(size), MSG_WAITALL);
+    if (status == -1) {
+        return status;
+    }
+
+    size = ntohl(size);
+
+    uint8_t *buf = new uint8_t[size];
+
+    // Receive.
+    status = recv(sockfd, buf, size, MSG_WAITALL);
+    if (status != -1) {
+        // Decode. XXX check result code (a bool, undocumented).
+        response.ParseFromArray(buf, size);
+    }
+
+    delete[] buf;
+
+    return status;
 }
 
 // Finds a parameter of the form "%d" or "%0Nd" (where N is a positive integer)

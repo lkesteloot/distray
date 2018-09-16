@@ -1,39 +1,179 @@
 
 #include <cstring>
 #include <stdexcept>
-
-#include <nng/nng.h>
-#include <nng/protocol/reqrep0/rep.h>
-#include <nng/protocol/reqrep0/req.h>
-#include <nng/supplemental/util/platform.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <poll.h>
 
 #include "controller.hpp"
 #include "Drp.pb.h"
 #include "util.hpp"
 
-static void fatal(const char *func, int rv)
-{
-    fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
-    exit(1);
-}
+// Represents data that needs to be sent asynchronously.
+class OutgoingBuffer {
+public:
+    // File descriptor we're sending on.
+    int m_fd;
+
+    // Buffer includes size header.
+    uint8_t *m_buffer;
+
+    // Size includes size header.
+    uint32_t m_size;
+
+    // How many bytes have been sent.
+    uint32_t m_sent;
+
+    OutgoingBuffer(int fd)
+        : m_fd(fd), m_buffer(nullptr), m_size(0), m_sent(0) {
+
+        // Nothing.
+    }
+
+    virtual ~OutgoingBuffer() {
+        delete[] m_buffer;
+    }
+
+    // Set the outgoing message. Does not send anything.
+    void set_message(const google::protobuf::Message &message) {
+        delete[] m_buffer;
+
+        int data_size = message.ByteSize();
+        m_size = data_size + sizeof(data_size);
+        m_buffer = new uint8_t[m_size];
+        *((uint32_t *) m_buffer) = htonl(data_size);
+        message.SerializeToArray(m_buffer + sizeof(data_size), data_size);
+        m_sent = 0;
+    }
+
+    // Whether we have something to write.
+    bool need_send() const {
+        return m_sent < m_size;
+    }
+
+    // Sends as much as it can. Returns whether successful. If not, sets errno.
+    bool send() {
+        if (need_send()) {
+            uint32_t bytes_left = m_size - m_sent;
+
+            int sent_here = ::send(m_fd, m_buffer + m_sent, bytes_left, 0);
+            if (sent_here == -1) {
+                return false;
+            }
+
+            m_sent += sent_here;
+        }
+
+        return true;
+    }
+};
+
+// Buffer that accumulates bytes until enough are ready to receive a message.
+class IncomingBuffer {
+public:
+    // File descriptor we're receiving on.
+    int m_fd;
+
+    // Buffer does not include size header.
+    uint8_t *m_buffer;
+
+    // Size does not include size header.
+    uint32_t m_size;
+
+    // Whether we've received the size.
+    bool m_have_size;
+
+    // How many bytes have been received. If m_have_size is false, it's
+    // bytes of size; otherwise bytes of buffer.
+    uint32_t m_received;
+
+    // Buffer capacity.
+    uint32_t m_capacity;
+
+    IncomingBuffer(int fd)
+        : m_fd(fd), m_buffer(nullptr), m_size(0), m_have_size(false), m_received(0), m_capacity(0) {
+
+        // Nothing.
+    }
+
+    virtual ~IncomingBuffer() {
+        delete[] m_buffer;
+    }
+
+    // Get the message. Assumes that need_receive() is false. Returns whether successful.
+    bool get_message(google::protobuf::Message &message) {
+        return message.ParseFromArray(m_buffer, m_size);
+    }
+
+    // Get ready for the next message.
+    void reset() {
+        m_size = 0;
+        m_have_size = false;
+        m_received = 0;
+    }
+
+    // Whether we want to receive more bytes for this message.
+    bool need_receive() const {
+        return !m_have_size || m_received < m_size;
+    }
+
+    // Receive as many bytes as we can. Returns whether successful. If not, sets errno.
+    bool receive() {
+        if (m_have_size) {
+            int bytes_left = m_size - m_received;
+
+            int received_here = recv(m_fd, m_buffer + m_received, bytes_left, 0);
+            if (received_here == -1) {
+                return false;
+            }
+
+            m_received += received_here;
+        } else {
+            // We don't yet have the size. Go for that.
+            int bytes_left = sizeof(m_size) - m_received;
+
+            int received_here = recv(m_fd, ((uint8_t *) &m_size) + m_received, bytes_left, 0);
+            if (received_here == -1) {
+                return false;
+            }
+
+            m_received += received_here;
+            if (m_received == sizeof(m_size)) {
+                m_size = ntohl(m_size);
+                m_have_size = true;
+                m_received = 0;
+
+                // Grow buffer if necessary.
+                if (m_capacity < m_size) {
+                    delete[] m_buffer;
+                    m_buffer = new uint8_t[m_size];
+                    m_capacity = m_size;
+                }
+            }
+        }
+
+        return true;
+    }
+};
 
 // Represents a remote worker. Stores our state for it.
 class RemoteWorker {
 public:
     enum State {
         // Initial states.
-        INIT,
-        SENT_WELCOME_REQUEST,
-        WAIT_WELCOME_RESPONSE,
+        SEND_WELCOME_REQUEST,
+        RECEIVE_WELCOME_RESPONSE,
 
         // Waiting for assignment.
         IDLE,
 
         // Sending an execute command.
         SEND_EXECUTE_REQUEST,
-        SENT_EXECUTE_REQUEST,
-        WAIT_EXECUTE_RESPONSE,
+        RECEIVE_EXECUTE_RESPONSE,
     };
+
+    // Networking file descriptor.
+    int m_fd;
 
     // Our current state in the state machine.
     State m_state;
@@ -44,26 +184,51 @@ public:
     // Whatever frame we're working on, or -1 for none.
     int m_frame;
 
+    // Buffer for outgoing and incoming messages.
+    OutgoingBuffer m_outgoing_buffer;
+    IncomingBuffer m_incoming_buffer;
+
     // Hostname of this remote machine. Empty if no one has connected yet.
     std::string m_hostname;
 
-    // NNG's async I/O state for this socket.
-    nng_aio *m_aio;
+    RemoteWorker(int fd, const Parameters &parameters)
+        : m_fd(fd), m_state(SEND_WELCOME_REQUEST), m_parameters(parameters), m_frame(-1),
+            m_outgoing_buffer(fd), m_incoming_buffer(fd) {
 
-    // Context for the NNG req/res protocol.
-    nng_ctx m_ctx;
+        // Nothing.
+    }
 
-    RemoteWorker(nng_socket sock, const Parameters &parameters)
-        : m_state(INIT), m_parameters(parameters), m_frame(-1) {
+    // Get the structure for poll().
+    struct pollfd get_pollfd() const {
+        struct pollfd pollfd;
 
-        int rv;
+        pollfd.fd = m_fd;
+        pollfd.events =
+            (m_outgoing_buffer.need_send() ? POLLOUT : 0) |
+            (m_incoming_buffer.need_receive() ? POLLIN : 0);
+        pollfd.revents = 0;
 
-        if ((rv = nng_aio_alloc(&m_aio, callback, this)) != 0) {
-            fatal("nng_aio_alloc", rv);
+        return pollfd;
+    }
+
+    // Send what we can.
+    bool send() {
+        return m_outgoing_buffer.send();
+    }
+
+    // Receive as many bytes as we can. Returns whether successful. If not, sets errno.
+    bool receive() {
+        bool success = m_incoming_buffer.receive();
+        if (!success) {
+            return success;
         }
-        if ((rv = nng_ctx_open(&m_ctx, sock)) != 0) {
-            fatal("nng_ctx_open", rv);
+
+        if (!m_incoming_buffer.need_receive()) {
+            // We're done, decode it.
+            dispatch();
         }
+
+        return true;
     }
 
     // Kick off the process.
@@ -102,24 +267,15 @@ private:
         // std::cout << "RemoteWorker: state = " << m_state << "\n";
 
         switch (m_state) {
-            case INIT: {
+            case SEND_WELCOME_REQUEST: {
                 // Send welcome message.
                 Drp::Request request;
                 request.set_request_type(Drp::WELCOME);
-                send_request(request, SENT_WELCOME_REQUEST);
+                send_request(request, RECEIVE_WELCOME_RESPONSE);
                 break;
             }
 
-            case SENT_WELCOME_REQUEST: {
-                check_result();
-                m_state = WAIT_WELCOME_RESPONSE;
-                // This might call us synchronously, do it last:
-                nng_ctx_recv(m_ctx, m_aio);
-                break;
-            }
-
-            case WAIT_WELCOME_RESPONSE: {
-                check_result();
+            case RECEIVE_WELCOME_RESPONSE: {
                 Drp::Response response;
                 receive_response(response, Drp::WELCOME);
                 m_hostname = response.welcome_response().hostname();
@@ -143,20 +299,11 @@ private:
                 for (std::string argument : m_parameters.m_arguments) {
                     execute_request->add_argument(substitute_parameter(argument, m_frame));
                 }
-                send_request(request, SENT_EXECUTE_REQUEST);
+                send_request(request, RECEIVE_EXECUTE_RESPONSE);
                 break;
             }
 
-            case SENT_EXECUTE_REQUEST: {
-                check_result();
-                m_state = WAIT_EXECUTE_RESPONSE;
-                // This might call us synchronously, do it last:
-                nng_ctx_recv(m_ctx, m_aio);
-                break;
-            }
-
-            case WAIT_EXECUTE_RESPONSE: {
-                check_result();
+            case RECEIVE_EXECUTE_RESPONSE: {
                 Drp::Response response;
                 receive_response(response, Drp::EXECUTE);
                 // std::cout << "status: " << response.execute_response().status() << "\n";
@@ -166,46 +313,32 @@ private:
         }
     }
 
-    void check_result() {
-        int rv;
-
-        if ((rv = nng_aio_result(m_aio)) != 0) {
-            fatal("nng_aio_result", rv);
-        }
-    }
-
     void send_request(const Drp::Request &request, State next_state) {
-        // Serialize to bytes.
-        size_t size = request.ByteSize();
-        nng_msg *msg;
-        int rv;
-        if ((rv = nng_msg_alloc(&msg, size)) != 0) {
-            fatal("nng_msg_alloc", rv);
-        }
-        void *buf = nng_msg_body(msg);
-        request.SerializeToArray(buf, size);
-        nng_aio_set_msg(m_aio, msg);
+        m_incoming_buffer.reset();
+        m_outgoing_buffer.set_message(request);
         m_state = next_state;
-        // This might call us synchronously, do it last:
-        nng_ctx_send(m_ctx, m_aio);
     }
 
     void receive_response(Drp::Response &response, Drp::RequestType expected_request_type) {
-        nng_msg *msg = nng_aio_get_msg(m_aio);
-        // Decode. XXX check result code (a bool, undocumented).
-        response.ParseFromArray(nng_msg_body(msg), nng_msg_len(msg));
-        nng_msg_free(msg);
+        bool success = m_incoming_buffer.get_message(response);
+        if (!success) {
+            std::cout << "Can't decode buffer into message.\n";
+            exit(1);
+        }
 
         if (response.request_type() != expected_request_type) {
             std::cout << "Got unknown response type " << response.request_type() <<
                 ", expected " << expected_request_type << "\n";
             exit(1);
         }
+
+        // Reset for next time.
+        m_incoming_buffer.reset();
     }
 };
 
 // Returns whether successful.
-static bool copy_in(nng_socket sock, const Parameters &parameters, int frame) {
+static bool copy_in(int sock, const Parameters &parameters, int frame) {
     for (const FileCopy &fileCopy : parameters.m_in_copies) {
         if ((frame >= 0) == fileCopy.m_either_has_parameter) {
             Drp::Request request;
@@ -220,14 +353,16 @@ static bool copy_in(nng_socket sock, const Parameters &parameters, int frame) {
                 std::cerr << "Error reading file " << fileCopy.m_source << "\n";
                 return -1;
             }
-            int rv = send_message(sock, request);
-            if (rv != 0) {
-                fatal("send_message", rv);
+            int rv = send_message_sock(sock, request);
+            if (rv == -1) {
+                perror("send_message_sock");
+                return false;
             }
 
-            rv = receive_message(sock, response);
-            if (rv != 0) {
-                fatal("receive_message", rv);
+            rv = receive_message_sock(sock, response);
+            if (rv == -1) {
+                perror("receive_message_sock");
+                return false;
             }
 
             if (request.request_type() == Drp::COPY_IN) {
@@ -245,7 +380,7 @@ static bool copy_in(nng_socket sock, const Parameters &parameters, int frame) {
 }
 
 // Returns whether successful.
-static bool copy_out(nng_socket sock, const Parameters &parameters, int frame) {
+static bool copy_out(int sock, const Parameters &parameters, int frame) {
     for (const FileCopy &fileCopy : parameters.m_out_copies) {
         if ((frame >= 0) == fileCopy.m_either_has_parameter) {
             Drp::Request request;
@@ -254,14 +389,16 @@ static bool copy_out(nng_socket sock, const Parameters &parameters, int frame) {
             request.set_request_type(Drp::COPY_OUT);
             Drp::CopyOutRequest *copy_out_request = request.mutable_copy_out_request();
             copy_out_request->set_pathname(substitute_parameter(fileCopy.m_source, frame));
-            int rv = send_message(sock, request);
-            if (rv != 0) {
-                fatal("send_message", rv);
+            int rv = send_message_sock(sock, request);
+            if (rv == -1) {
+                perror("send_message_sock");
+                return -1;
             }
 
-            rv = receive_message(sock, response);
-            if (rv != 0) {
-                fatal("receive_message", rv);
+            rv = receive_message_sock(sock, response);
+            if (rv == -1) {
+                perror("receive_message_sock");
+                return -1;
             }
 
             if (request.request_type() == Drp::COPY_OUT) {
@@ -285,18 +422,40 @@ static bool copy_out(nng_socket sock, const Parameters &parameters, int frame) {
 }
 
 int start_controller(const Parameters &parameters) {
-    nng_socket sock;
-    int rv;
+    // Create socket.
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        perror("socket");
+        return -1;
+    }
 
-    if ((rv = nng_req0_open(&sock)) != 0) {
-        fatal("nng_socket", rv);
+    int opt = 1;
+    int result = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if (result == -1) {
+        perror("setsockopt");
+        return -1;
     }
-    // Raise limit on received message size. We trust senders.
-    if ((rv = nng_setopt_size(sock, NNG_OPT_RECVMAXSZ, 20*1024*1024)) != 0) {
-        fatal("nng_setopt_size", rv);
+    result = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+    if (result == -1) {
+        perror("setsockopt");
+        return -1;
     }
-    if ((rv = nng_listen(sock, parameters.m_url.c_str(), NULL, 0)) != 0) {
-        fatal("nng_listen", rv);
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(1120);
+
+    result = bind(sockfd, (struct sockaddr *) &addr, sizeof(addr));
+    if (result == -1) {
+        perror("bind");
+        return -1;
+    }
+
+    result = listen(sockfd, 10);
+    if (result == -1) {
+        perror("listen");
+        return -1;
     }
 
     // Get all frames.
@@ -304,14 +463,58 @@ int start_controller(const Parameters &parameters) {
 
     std::vector<RemoteWorker *> remote_workers;
 
-    for (int i = 0; i < 1; i++) {
-        RemoteWorker *remote_worker = new RemoteWorker(sock, parameters);
-        remote_workers.push_back(remote_worker);
-        remote_worker->start();
-    }
-
     while (!frames.empty()) {
-        nng_msleep(100);
+        std::vector<struct pollfd> pollfds;
+
+        // Listening socket.
+        pollfds.resize(1);
+        pollfds[0].fd = sockfd;
+        pollfds[0].events = POLLIN;
+        pollfds[0].revents = 0;
+
+        for (RemoteWorker *remote_worker : remote_workers) {
+            pollfds.push_back(remote_worker->get_pollfd());
+        }
+
+        result = poll(pollfds.data(), pollfds.size(), -1);
+        if (result == -1) {
+            perror("poll");
+            return -1;
+        }
+
+        for (int i = 0; i < pollfds.size(); i++) {
+            // printf("%d: %x\n", i, pollfds[i].revents);
+            if ((pollfds[i].revents & POLLIN) != 0) {
+                if (i == 0) {
+                    struct sockaddr_in remote_addr;
+                    socklen_t remote_addr_len = sizeof(remote_addr);
+                    int connfd = accept(sockfd, (struct sockaddr *) &remote_addr, &remote_addr_len);
+                    if (result == -1) {
+                        perror("accept");
+                        return -1;
+                    }
+
+                    RemoteWorker *remote_worker = new RemoteWorker(connfd, parameters);
+                    remote_workers.push_back(remote_worker);
+                    remote_worker->start();
+                } else {
+                    bool success = remote_workers[i - 1]->receive();
+                    if (!success) {
+                        perror("worker receive");
+                        return -1;
+                    }
+                }
+            }
+            if ((pollfds[i].revents & POLLOUT) != 0) {
+                if (i > 0) {
+                    bool success = remote_workers[i - 1]->send();
+                    if (!success) {
+                        perror("worker send");
+                        return -1;
+                    }
+                }
+            }
+        }
 
         for (RemoteWorker *remote_worker : remote_workers) {
             if (remote_worker->is_idle()) {
@@ -325,21 +528,49 @@ int start_controller(const Parameters &parameters) {
     return 0;
 }
 
-#if 0
 int start_controller_sync(const Parameters &parameters) {
-    nng_socket sock;
-    int rv;
-    const Frames &frames = parameters.m_frames;
+    // Create socket.
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        perror("socket");
+        return -1;
+    }
 
-    if ((rv = nng_req0_open(&sock)) != 0) {
-        fatal("nng_socket", rv);
+    int opt = 1;
+    int result = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if (result == -1) {
+        perror("setsockopt");
+        return -1;
     }
-    // Raise limit on received message size. We trust senders.
-    if ((rv = nng_setopt_size(sock, NNG_OPT_RECVMAXSZ, 20*1024*1024)) != 0) {
-        fatal("nng_setopt_size", rv);
+    result = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+    if (result == -1) {
+        perror("setsockopt");
+        return -1;
     }
-    if ((rv = nng_listen(sock, parameters.m_url.c_str(), NULL, 0)) != 0) {
-        fatal("nng_listen", rv);
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(1120);
+
+    result = bind(sockfd, (struct sockaddr *) &addr, sizeof(addr));
+    if (result == -1) {
+        perror("bind");
+        return -1;
+    }
+
+    result = listen(sockfd, 10);
+    if (result == -1) {
+        perror("listen");
+        return -1;
+    }
+
+    struct sockaddr_in remote_addr;
+    socklen_t remote_addr_len = sizeof(remote_addr);
+    int connfd = accept(sockfd, (struct sockaddr *) &remote_addr, &remote_addr_len);
+    if (result == -1) {
+        perror("accept");
+        return -1;
     }
 
     // Send welcome message.
@@ -348,28 +579,31 @@ int start_controller_sync(const Parameters &parameters) {
         Drp::Response response;
 
         request.set_request_type(Drp::WELCOME);
-        rv = send_message(sock, request);
-        if (rv != 0) {
-            fatal("send_message", rv);
+        result = send_message_sock(connfd, request);
+        if (result == -1) {
+            perror("send_message_sock");
+            return -1;
         }
 
-        rv = receive_message(sock, response);
-        if (rv != 0) {
-            fatal("receive_message", rv);
+        result = receive_message_sock(connfd, response);
+        if (result == -1) {
+            perror("receive_message_sock");
+            return -1;
         }
 
-        if (request.request_type() == Drp::WELCOME) {
+        if (response.request_type() == Drp::WELCOME) {
             std::cout << "hostname: " << response.welcome_response().hostname() <<
                 ", cores: " << response.welcome_response().core_count() << "\n";
         } else {
-            std::cout << "Got unknown response type " << request.request_type() << "\n";
+            std::cout << "Got unknown response type " << response.request_type() << "\n";
         }
     }
 
     // Copy files to worker.
     // XXX Fail everything if this fails.
-    copy_in(sock, parameters, -1);
+    copy_in(connfd, parameters, -1);
 
+    const Frames &frames = parameters.m_frames;
     int frame = frames.m_first;
 
     while (!frames.is_done(frame)) {
@@ -377,7 +611,7 @@ int start_controller_sync(const Parameters &parameters) {
 
         // Copy files to worker.
         // XXX Fail everything if this fails.
-        copy_in(sock, parameters, frame);
+        copy_in(connfd, parameters, frame);
 
         // Send execute program message.
         {
@@ -390,14 +624,16 @@ int start_controller_sync(const Parameters &parameters) {
             for (std::string argument : parameters.m_arguments) {
                 execute_request->add_argument(substitute_parameter(argument, frame));
             }
-            rv = send_message(sock, request);
-            if (rv != 0) {
-                fatal("send_message", rv);
+            result = send_message_sock(connfd, request);
+            if (result == -1) {
+                perror("send_message_sock");
+                return -1;
             }
 
-            rv = receive_message(sock, response);
-            if (rv != 0) {
-                fatal("receive_message", rv);
+            result = receive_message_sock(connfd, response);
+            if (result == -1) {
+                perror("receive_message_sock");
+                return -1;
             }
 
             if (request.request_type() == Drp::EXECUTE) {
@@ -409,7 +645,7 @@ int start_controller_sync(const Parameters &parameters) {
 
         // Copy files from worker.
         // XXX Fail everything if this fails.
-        copy_out(sock, parameters, frame);
+        copy_out(connfd, parameters, frame);
 
         // Next frame.
         frame += frames.m_step;
@@ -417,10 +653,10 @@ int start_controller_sync(const Parameters &parameters) {
 
     // Copy files from worker.
     // XXX Fail everything if this fails.
-    copy_out(sock, parameters, -1);
+    copy_out(connfd, parameters, -1);
 
-    nng_close(sock);
+    // close(connfd);
+    // close(sockfd);
 
     return 0;
 }
-#endif
