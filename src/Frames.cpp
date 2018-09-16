@@ -56,3 +56,13 @@ bool Frames::parse(const std::string &spec) {
 
     return true;
 }
+
+std::deque<int> Frames::get_all() const {
+    std::deque<int> v;
+
+    for (int frame = m_first; !is_done(frame); frame += m_step) {
+        v.push_back(frame);
+    }
+
+    return v;
+}

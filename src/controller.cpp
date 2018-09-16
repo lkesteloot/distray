@@ -26,13 +26,13 @@ public:
         SENT_WELCOME_REQUEST,
         WAIT_WELCOME_RESPONSE,
 
+        // Waiting for assignment.
+        IDLE,
+
         // Sending an execute command.
         SEND_EXECUTE_REQUEST,
         SENT_EXECUTE_REQUEST,
         WAIT_EXECUTE_RESPONSE,
-
-        // Finished with this worker. XXX remove?
-        DONE,
     };
 
     // Our current state in the state machine.
@@ -41,6 +41,12 @@ public:
     // User parameters.
     const Parameters &m_parameters;
 
+    // Whatever frame we're working on, or -1 for none.
+    int m_frame;
+
+    // Hostname of this remote machine. Empty if no one has connected yet.
+    std::string m_hostname;
+
     // NNG's async I/O state for this socket.
     nng_aio *m_aio;
 
@@ -48,7 +54,7 @@ public:
     nng_ctx m_ctx;
 
     RemoteWorker(nng_socket sock, const Parameters &parameters)
-        : m_state(INIT), m_parameters(parameters) {
+        : m_state(INIT), m_parameters(parameters), m_frame(-1) {
 
         int rv;
 
@@ -65,6 +71,23 @@ public:
         dispatch();
     }
 
+    bool is_idle() {
+        return m_state == IDLE;
+    }
+
+    void run_frame(int frame) {
+        if (!is_idle()) {
+            std::cerr << "Error: Gave a frame to a non-idle worker.\n";
+            exit(1);
+        }
+
+        std::cout << "Starting frame " << frame << " on " << m_hostname << "\n";
+
+        m_frame = frame;
+        m_state = SEND_EXECUTE_REQUEST;
+        dispatch();
+    }
+
 private:
     // C-style static callback.
     static void callback(void *arg) {
@@ -76,7 +99,7 @@ private:
 
     // Move the state machine forward.
     void dispatch() {
-        std::cout << "RemoteWorker: state = " << m_state << "\n";
+        // std::cout << "RemoteWorker: state = " << m_state << "\n";
 
         switch (m_state) {
             case INIT: {
@@ -99,11 +122,17 @@ private:
                 check_result();
                 Drp::Response response;
                 receive_response(response, Drp::WELCOME);
-                std::cout << "hostname: " << response.welcome_response().hostname() <<
+                m_hostname = response.welcome_response().hostname();
+                std::cout << "hostname: " << m_hostname <<
                     ", cores: " << response.welcome_response().core_count() << "\n";
-                m_state = SEND_EXECUTE_REQUEST;
-                nng_sleep_aio(1, m_aio);
+                m_state = IDLE;
                 break;
+            }
+
+            case IDLE: {
+                // We're never dispatched in idle mode.
+                std::cout << "Should not be in IDLE.\n";
+                exit(1);
             }
 
             case SEND_EXECUTE_REQUEST: {
@@ -112,7 +141,7 @@ private:
                 Drp::ExecuteRequest *execute_request = request.mutable_execute_request();
                 execute_request->set_executable(m_parameters.m_executable);
                 for (std::string argument : m_parameters.m_arguments) {
-                    execute_request->add_argument(substitute_parameter(argument, 5));
+                    execute_request->add_argument(substitute_parameter(argument, m_frame));
                 }
                 send_request(request, SENT_EXECUTE_REQUEST);
                 break;
@@ -130,13 +159,8 @@ private:
                 check_result();
                 Drp::Response response;
                 receive_response(response, Drp::EXECUTE);
-                std::cout << "status: " << response.execute_response().status() << "\n";
-                m_state = DONE;
-                nng_sleep_aio(1, m_aio);
-                break;
-            }
-
-            case DONE: {
+                // std::cout << "status: " << response.execute_response().status() << "\n";
+                m_state = IDLE;
                 break;
             }
         }
@@ -275,13 +299,27 @@ int start_controller(const Parameters &parameters) {
         fatal("nng_listen", rv);
     }
 
-    RemoteWorker remoteWorker(sock, parameters);
+    // Get all frames.
+    std::deque<int> frames = parameters.m_frames.get_all();
 
-    remoteWorker.start();
+    std::vector<RemoteWorker *> remote_workers;
 
-    for (;;) {
-        nng_msleep(3600000);
+    remote_workers.push_back(new RemoteWorker(sock, parameters));
+    remote_workers[0]->start();
+
+    while (!frames.empty()) {
+        nng_msleep(100);
+
+        for (RemoteWorker *remote_worker : remote_workers) {
+            if (remote_worker->is_idle()) {
+                int frame = frames.front();
+                frames.pop_front();
+                remote_worker->run_frame(frame);
+            }
+        }
     }
+
+    return 0;
 }
 
 int start_controller_sync(const Parameters &parameters) {
