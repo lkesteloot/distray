@@ -142,7 +142,7 @@ int start_worker(const Parameters &parameters) {
         Drp::Request request;
         Drp::Response response;
 
-        result = receive_message_sock(sockfd, request);
+        result = receive_message_sock(sockfd, request); // XXX remove _sock suffix
         if (result == -1) {
             perror("receive_message_sock");
             return -1;

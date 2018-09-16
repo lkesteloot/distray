@@ -26,7 +26,7 @@ static int test_has_parameter() {
     for (PathnameHasParameter &p : m_has_parameter) {
         std::cerr << "    " << p.m_str << ": ";
 
-        bool actual = has_parameter(p.m_str);
+        bool actual = string_has_parameter(p.m_str);
         if (actual == p.m_expected) {
             std::cerr << "pass\n";
         } else {

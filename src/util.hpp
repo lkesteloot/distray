@@ -15,7 +15,7 @@ int send_message_sock(int sockfd, const google::protobuf::Message &request);
 int receive_message_sock(int sockfd, google::protobuf::Message &response);
 
 // Whether a string includes a parameter ("%d" or "%0Nd").
-bool has_parameter(const std::string &str);
+bool string_has_parameter(const std::string &str);
 
 // Substitute a parameter ("%d" or "%0Nd") into the string. Does no
 // expansion if the value is negative.

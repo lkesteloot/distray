@@ -25,14 +25,17 @@ struct FileCopy {
     std::string m_destination;
     bool m_source_has_parameter;
     bool m_destination_has_parameter;
-    bool m_either_has_parameter;
 
     FileCopy(const std::string &source, const std::string &destination)
         : m_source(source), m_destination(destination) {
 
-        m_source_has_parameter = has_parameter(m_source);
-        m_destination_has_parameter = has_parameter(m_destination);
-        m_either_has_parameter = m_source_has_parameter || m_destination_has_parameter;
+        m_source_has_parameter = string_has_parameter(m_source);
+        m_destination_has_parameter = string_has_parameter(m_destination);
+    }
+
+    // If either source or destination has a parameter.
+    bool has_parameter() const {
+        return m_source_has_parameter || m_destination_has_parameter;
     }
 };
 

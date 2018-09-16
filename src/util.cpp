@@ -57,7 +57,12 @@ int receive_message_sock(int sockfd, google::protobuf::Message &response) {
     // Receive length.
     int status = recv(sockfd, &size, sizeof(size), MSG_WAITALL);
     if (status == -1) {
+        perror("recv1");
         return status;
+    } else if (status != sizeof(size)) {
+        // XXX handle 0, which means other side closed connection.
+        std::cout << "Received " << status << " bytes instead of " << sizeof(size) << "\n";
+        exit(-1);
     }
 
     size = ntohl(size);
@@ -66,7 +71,13 @@ int receive_message_sock(int sockfd, google::protobuf::Message &response) {
 
     // Receive.
     status = recv(sockfd, buf, size, MSG_WAITALL);
-    if (status != -1) {
+    if (status == -1) {
+        perror("recv2");
+    } else if (status != size) {
+        // XXX handle 0, which means other side closed connection.
+        std::cout << "Received " << status << " bytes instead of " << size << "\n";
+        exit(-1);
+    } else {
         // Decode. XXX check result code (a bool, undocumented).
         response.ParseFromArray(buf, size);
     }
@@ -113,7 +124,7 @@ static bool find_parameter(const std::string &str, int &begin, int &end, int &wi
     }
 }
 
-bool has_parameter(const std::string &str) {
+bool string_has_parameter(const std::string &str) {
     int begin, end, width;
 
     return find_parameter(str, begin, end, width);
