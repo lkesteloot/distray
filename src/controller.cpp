@@ -5,6 +5,7 @@
 #include <nng/nng.h>
 #include <nng/protocol/reqrep0/rep.h>
 #include <nng/protocol/reqrep0/req.h>
+#include <nng/supplemental/util/platform.h>
 
 #include "controller.hpp"
 #include "Drp.pb.h"
@@ -20,16 +21,34 @@ static void fatal(const char *func, int rv)
 class RemoteWorker {
 public:
     enum State {
+        // Initial states.
         INIT,
+        SENT_WELCOME_REQUEST,
+        WAIT_WELCOME_RESPONSE,
+
+        // Sending an execute command.
+        SEND_EXECUTE_REQUEST,
+        SENT_EXECUTE_REQUEST,
+        WAIT_EXECUTE_RESPONSE,
+
+        // Finished with this worker. XXX remove?
+        DONE,
     };
 
+    // Our current state in the state machine.
     State m_state;
+
+    // User parameters.
+    const Parameters &m_parameters;
+
+    // NNG's async I/O state for this socket.
     nng_aio *m_aio;
-    nng_msg *m_msg;
+
+    // Context for the NNG req/res protocol.
     nng_ctx m_ctx;
 
-    RemoteWorker(nng_socket sock)
-        : m_state(INIT), m_msg(nullptr) {
+    RemoteWorker(nng_socket sock, const Parameters &parameters)
+        : m_state(INIT), m_parameters(parameters) {
 
         int rv;
 
@@ -43,17 +62,121 @@ public:
 
     // Kick off the process.
     void start() {
-        callback();
+        dispatch();
     }
 
 private:
+    // C-style static callback.
     static void callback(void *arg) {
         RemoteWorker *remoteWorker = (RemoteWorker *) arg;
 
-        remoteWorker->callback();
+        // Delegate to dispatcher.
+        remoteWorker->dispatch();
     }
 
-    void callback() {
+    // Move the state machine forward.
+    void dispatch() {
+        std::cout << "RemoteWorker: state = " << m_state << "\n";
+
+        switch (m_state) {
+            case INIT: {
+                // Send welcome message.
+                Drp::Request request;
+                request.set_request_type(Drp::WELCOME);
+                send_request(request, SENT_WELCOME_REQUEST);
+                break;
+            }
+
+            case SENT_WELCOME_REQUEST: {
+                check_result();
+                m_state = WAIT_WELCOME_RESPONSE;
+                // This might call us synchronously, do it last:
+                nng_ctx_recv(m_ctx, m_aio);
+                break;
+            }
+
+            case WAIT_WELCOME_RESPONSE: {
+                check_result();
+                Drp::Response response;
+                receive_response(response, Drp::WELCOME);
+                std::cout << "hostname: " << response.welcome_response().hostname() <<
+                    ", cores: " << response.welcome_response().core_count() << "\n";
+                m_state = SEND_EXECUTE_REQUEST;
+                nng_sleep_aio(1, m_aio);
+                break;
+            }
+
+            case SEND_EXECUTE_REQUEST: {
+                Drp::Request request;
+                request.set_request_type(Drp::EXECUTE);
+                Drp::ExecuteRequest *execute_request = request.mutable_execute_request();
+                execute_request->set_executable(m_parameters.m_executable);
+                for (std::string argument : m_parameters.m_arguments) {
+                    execute_request->add_argument(substitute_parameter(argument, 5));
+                }
+                send_request(request, SENT_EXECUTE_REQUEST);
+                break;
+            }
+
+            case SENT_EXECUTE_REQUEST: {
+                check_result();
+                m_state = WAIT_EXECUTE_RESPONSE;
+                // This might call us synchronously, do it last:
+                nng_ctx_recv(m_ctx, m_aio);
+                break;
+            }
+
+            case WAIT_EXECUTE_RESPONSE: {
+                check_result();
+                Drp::Response response;
+                receive_response(response, Drp::EXECUTE);
+                std::cout << "status: " << response.execute_response().status() << "\n";
+                m_state = DONE;
+                nng_sleep_aio(1, m_aio);
+                break;
+            }
+
+            case DONE: {
+                break;
+            }
+        }
+    }
+
+    void check_result() {
+        int rv;
+
+        if ((rv = nng_aio_result(m_aio)) != 0) {
+            fatal("nng_aio_result", rv);
+        }
+    }
+
+    void send_request(const Drp::Request &request, State next_state) {
+        // Serialize to bytes.
+        size_t size = request.ByteSize();
+        nng_msg *msg;
+        int rv;
+        if ((rv = nng_msg_alloc(&msg, size)) != 0) {
+            fatal("nng_msg_alloc", rv);
+        }
+        void *buf = nng_msg_body(msg);
+        request.SerializeToArray(buf, size);
+        nng_aio_set_msg(m_aio, msg);
+        m_state = next_state;
+        // This might call us synchronously, do it last:
+        nng_ctx_send(m_ctx, m_aio);
+    }
+
+    void receive_response(Drp::Response &response, Drp::RequestType expected_request_type) {
+        nng_msg *msg = nng_aio_get_msg(m_aio);
+        // Decode. XXX check result code (a bool, undocumented).
+        response.ParseFromArray(nng_msg_body(msg), nng_msg_len(msg));
+        nng_msg_free(msg);
+
+        if (response.request_type() != expected_request_type) {
+            std::cout << "Got unknown response type " << response.request_type() <<
+                ", expected " << expected_request_type << "\n";
+            exit(1);
+        }
     }
 };
 
@@ -138,6 +261,30 @@ static bool copy_out(nng_socket sock, const Parameters &parameters, int frame) {
 }
 
 int start_controller(const Parameters &parameters) {
+    nng_socket sock;
+    int rv;
+
+    if ((rv = nng_req0_open(&sock)) != 0) {
+        fatal("nng_socket", rv);
+    }
+    // Raise limit on received message size. We trust senders.
+    if ((rv = nng_setopt_size(sock, NNG_OPT_RECVMAXSZ, 20*1024*1024)) != 0) {
+        fatal("nng_setopt_size", rv);
+    }
+    if ((rv = nng_listen(sock, parameters.m_url.c_str(), NULL, 0)) != 0) {
+        fatal("nng_listen", rv);
+    }
+
+    RemoteWorker remoteWorker(sock, parameters);
+
+    remoteWorker.start();
+
+    for (;;) {
+        nng_msleep(3600000);
+    }
+}
+
+int start_controller_sync(const Parameters &parameters) {
     nng_socket sock;
     int rv;
     const Frames &frames = parameters.m_frames;
