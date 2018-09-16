@@ -304,8 +304,11 @@ int start_controller(const Parameters &parameters) {
 
     std::vector<RemoteWorker *> remote_workers;
 
-    remote_workers.push_back(new RemoteWorker(sock, parameters));
-    remote_workers[0]->start();
+    for (int i = 0; i < 1; i++) {
+        RemoteWorker *remote_worker = new RemoteWorker(sock, parameters);
+        remote_workers.push_back(remote_worker);
+        remote_worker->start();
+    }
 
     while (!frames.empty()) {
         nng_msleep(100);
@@ -322,6 +325,7 @@ int start_controller(const Parameters &parameters) {
     return 0;
 }
 
+#if 0
 int start_controller_sync(const Parameters &parameters) {
     nng_socket sock;
     int rv;
@@ -419,3 +423,4 @@ int start_controller_sync(const Parameters &parameters) {
 
     return 0;
 }
+#endif
