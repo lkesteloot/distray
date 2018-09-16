@@ -6,10 +6,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include <nng/nng.h>
-#include <nng/protocol/reqrep0/rep.h>
-#include <nng/protocol/reqrep0/req.h>
-
 #include "worker.hpp"
 #include "Drp.pb.h"
 #include "util.hpp"

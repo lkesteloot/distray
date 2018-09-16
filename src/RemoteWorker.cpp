@@ -108,6 +108,8 @@ void RemoteWorker::dispatch() {
                 break;
             }
         }
+
+        // List of states that need immediate action:
     } while (m_state == SEND_WELCOME_REQUEST
             || m_state == SEND_COPY_IN_NON_FRAME_FILE
             || m_state == SEND_COPY_IN_FRAME_FILE

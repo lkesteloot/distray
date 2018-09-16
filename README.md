@@ -10,10 +10,6 @@ You'll need the protobuf compiler and library:
 
     % sudo apt-get install protobuf-compiler libprotobuf-dev
 
-If the `nng` directory is empty, fill it out with this command:
-
-    % git submodule update --init --recursive
-
 Build distrend using CMake:
 
     % mkdir build
