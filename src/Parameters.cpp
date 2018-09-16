@@ -69,7 +69,7 @@ void Parameters::usage() const {
     std::cerr << "    proxy [FLAGS]\n";
     std::cerr << "        --password     PASSWORD Password to expect from workers or the\n";
     std::cerr << "                       controller. Defaults to an empty string.\n";
-    std::cerr << "        --listen URL   URL to listen on [tcp://0.0.0.0:1120].\n";
+    std::cerr << "        --listen URL   URL to listen on [tcp://:1120].\n";
     std::cerr << "\n";
     std::cerr << "    controller [FLAGS] FRAMES EXEC [PARAMETERS...]\n";
     std::cerr << "        FRAMES is a frame range specification: FIRST[,LAST[,STEP]],\n";
@@ -84,7 +84,7 @@ void Parameters::usage() const {
     std::cerr << "        --out REMOTE LOCAL  Copy REMOTE file to LOCAL file. Can be repeated.\n";
     std::cerr << "        --password PASSWORD Password to expect from workers or to pass\n";
     std::cerr << "                            to proxies. Defaults to an empty string.\n";
-    std::cerr << "        --listen URL        URL to listen on [tcp://0.0.0.0:1120].\n";
+    std::cerr << "        --listen URL        URL to listen on [tcp://:1120].\n";
 }
 
 // Fills parameters and returns 0 on success; otherwise returns program exit status.
@@ -121,7 +121,7 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
     // Default value for incoming URL.
     if (m_command == CMD_PROXY || m_command == CMD_CONTROLLER) {
         // Listen on all IPv4 interfaces.
-        m_url = "tcp://0.0.0.0:1120";
+        m_url = "tcp://:1120";
     }
 
     while (args.next_is_flag()) {
