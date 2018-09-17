@@ -1,7 +1,7 @@
 #ifndef UTIL_HPP
 #define UTIL_HPP
 
-#include "Drp.pb.h"
+#include <google/protobuf/message.h>
 
 int send_message(int sockfd, const google::protobuf::Message &request);
 int receive_message(int sockfd, google::protobuf::Message &response);

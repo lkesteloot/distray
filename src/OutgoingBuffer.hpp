@@ -5,7 +5,6 @@
 
 // Represents data that needs to be sent asynchronously.
 class OutgoingBuffer {
-public:
     // File descriptor we're sending on.
     int m_fd;
 
@@ -18,6 +17,7 @@ public:
     // How many bytes have been sent.
     uint32_t m_sent;
 
+public:
     OutgoingBuffer(int fd)
         : m_fd(fd), m_buffer(nullptr), m_size(0), m_sent(0) {
 

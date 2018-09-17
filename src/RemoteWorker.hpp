@@ -3,6 +3,7 @@
 
 #include <poll.h>
 
+#include "Drp.pb.h"
 #include "Parameters.hpp"
 #include "OutgoingBuffer.hpp"
 #include "IncomingBuffer.hpp"

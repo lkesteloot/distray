@@ -5,7 +5,6 @@
 
 // Buffer that accumulates bytes until enough are ready to receive a message.
 class IncomingBuffer {
-public:
     // File descriptor we're receiving on.
     int m_fd;
 
@@ -25,6 +24,7 @@ public:
     // Buffer capacity.
     uint32_t m_capacity;
 
+public:
     IncomingBuffer(int fd)
         : m_fd(fd), m_buffer(nullptr), m_size(0), m_have_size(false), m_received(0), m_capacity(0) {
 

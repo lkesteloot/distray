@@ -3,6 +3,7 @@
 #include <poll.h>
 
 #include "controller.hpp"
+#include "Drp.pb.h"
 #include "RemoteWorker.hpp"
 #include "Parameters.hpp"
 
