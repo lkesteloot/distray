@@ -3,7 +3,7 @@
 
 void RemoteWorker::dispatch() {
     do {
-        std::cout << "RemoteWorker: state = " << m_state << "\n";
+        // std::cout << "RemoteWorker: state = " << m_state << "\n";
 
         switch (m_state) {
             case SEND_WELCOME_REQUEST: {
@@ -41,7 +41,7 @@ void RemoteWorker::dispatch() {
 
             case IDLE: {
                 // We're never dispatched in idle mode.
-                std::cout << "Should not be in IDLE.\n";
+                std::cerr << "Should not be in IDLE.\n";
                 exit(1);
             }
 
@@ -171,7 +171,7 @@ void RemoteWorker::handle_copy_file_out_response(const Drp::Response &response, 
 
     if (!response.copy_out_response().success()) {
         // XXX handle.
-        std::cout << "copy out success: " << response.copy_out_response().success() << "\n";
+        std::cerr << "copy out success: " << response.copy_out_response().success() << "\n";
         exit(-1);
     }
 
@@ -179,7 +179,7 @@ void RemoteWorker::handle_copy_file_out_response(const Drp::Response &response, 
             response.copy_out_response().content());
     if (!success) {
         // XXX handle.
-        std::cout << "Could not write local file " << fileCopy.m_destination << "\n";
+        std::cerr << "Could not write local file " << fileCopy.m_destination << "\n";
         exit(-1);
     }
 }

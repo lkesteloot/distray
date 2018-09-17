@@ -89,7 +89,6 @@ static void handle_execute(const Drp::ExecuteRequest &request, Drp::ExecuteRespo
 
 static void handle_copy_out(const Drp::CopyOutRequest &request, Drp::CopyOutResponse &response) {
     std::string pathname = request.pathname();
-    std::cout << pathname << "\n";
 
     if (!is_pathname_local(pathname)) {
         // Shouldn't happen, we check this on the controller.
@@ -101,7 +100,6 @@ static void handle_copy_out(const Drp::CopyOutRequest &request, Drp::CopyOutResp
     try {
         response.set_content(read_file(pathname));
         response.set_success(true);
-        std::cerr << "Read from file: " << pathname << "\n";
     } catch (std::runtime_error e) {
         std::cerr << "Failed to read from file: " << pathname << "\n";
         response.set_success(false);
@@ -138,13 +136,13 @@ int start_worker(const Parameters &parameters) {
         Drp::Request request;
         Drp::Response response;
 
-        result = receive_message_sock(sockfd, request); // XXX remove _sock suffix
+        result = receive_message(sockfd, request);
         if (result == -1) {
             perror("receive_message_sock");
             return -1;
         }
 
-        std::cout << "Received message " << request.request_type() << "\n";
+        // std::cout << "Received message " << request.request_type() << "\n";
         response.set_request_type(request.request_type());
 
         switch (request.request_type()) {
@@ -173,7 +171,7 @@ int start_worker(const Parameters &parameters) {
                 break;
         }
 
-        result = send_message_sock(sockfd, response);
+        result = send_message(sockfd, response);
         if (result == -1) {
             perror("send_message_sock");
             return -1;

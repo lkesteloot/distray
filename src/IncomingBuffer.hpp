@@ -63,7 +63,7 @@ public:
                 return false;
             } else if (received_here == 0) {
                 // XXX handle.
-                std::cout << "IncomingBuffer got " << received_here << " instead of " << bytes_left << "\n";
+                std::cerr << "IncomingBuffer got " << received_here << " instead of " << bytes_left << "\n";
             }
 
             m_received += received_here;

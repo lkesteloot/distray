@@ -8,7 +8,7 @@
 
 #include "util.hpp"
 
-int send_message_sock(int sockfd, const google::protobuf::Message &request) {
+int send_message(int sockfd, const google::protobuf::Message &request) {
     // Serialize to bytes.
     uint32_t size = request.ByteSize();
     uint32_t full_size = size + sizeof(size);
@@ -24,7 +24,7 @@ int send_message_sock(int sockfd, const google::protobuf::Message &request) {
     return result;
 }
 
-int receive_message_sock(int sockfd, google::protobuf::Message &response) {
+int receive_message(int sockfd, google::protobuf::Message &response) {
     uint32_t size;
 
     // Receive length.

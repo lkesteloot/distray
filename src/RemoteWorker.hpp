@@ -72,17 +72,23 @@ public:
         // Nothing.
     }
 
-    // Get the structure for poll().
-    struct pollfd get_pollfd() const {
-        struct pollfd pollfd;
+    // The frame we were assigned to work on.
+    int get_frame() const {
+        return m_frame;
+    }
 
+    // Get the hostname. Might be empty if we've not gotten a welcome response.
+    const std::string &hostname() const {
+        return m_hostname;
+    }
+
+    // Fill the structure for poll().
+    void fill_pollfd(struct pollfd &pollfd) const {
         pollfd.fd = m_fd;
         pollfd.events =
             (m_outgoing_buffer.need_send() ? POLLOUT : 0) |
             (m_incoming_buffer.need_receive() ? POLLIN : 0);
         pollfd.revents = 0;
-
-        return pollfd;
     }
 
     // Send what we can.
