@@ -16,7 +16,10 @@ static uint8_t *g_tmp_buffer;
 
 // Buffer for passing data from one file descriptor to another.
 class Buffer {
-    std::deque<uint8_t> m_buffer;
+    // A string is not an efficient way to store this because we erase from
+    // the front. A deque doesn't work because it doesn't necessarily store
+    // its array contiguously, and there's no bulk addition or data API.
+    std::string m_buffer;
 
 public:
     // Whether the buffer could send data right now (is not empty).
@@ -34,7 +37,7 @@ public:
             }
 
             // Erase what we sent.
-            m_buffer.erase(m_buffer.begin(), m_buffer.begin() + sent_here);
+            m_buffer.erase(0, sent_here);
         }
 
         return true;
@@ -66,11 +69,7 @@ public:
 private:
     // Add the received data to the buffer.
     void add(uint8_t *data, int size) {
-        int existing_size = m_buffer.size();
-
-        // Add space for new data and copy it.
-        m_buffer.resize(existing_size + size);
-        memmove(&m_buffer[existing_size], data, size);
+        m_buffer.append((char *) data, size);
     }
 };
 
@@ -158,7 +157,7 @@ public:
 
 private:
     // Add entry to the list of pollfds if we're interested in this file
-    // descriptor.
+    // descriptor. The buffer is the outgoing buffer for this file descriptor.
     void add_pollfd(std::vector<struct pollfd> &pollfds, int fd, const Buffer &buffer) const {
         if (fd != -1) {
             struct pollfd pollfd;
@@ -188,6 +187,7 @@ static Connection *find(const std::vector<Connection *> &connections,
     return nullptr;
 }
 
+// Write connection statistics to standard out.
 static void log_connections(const std::vector<Connection *> &connections) {
     int only_worker = 0;
     int only_controller = 0;
@@ -209,6 +209,7 @@ static void log_connections(const std::vector<Connection *> &connections) {
     printf("%14d %14d %14d %14d\n", total, only_worker, only_controller, both);
 }
 
+// Close both sides of a connection and remove it from the collection.
 static void close_connection(std::vector<Connection *> &connections, Connection *connection) {
     // Shut down.
     connection->die();
