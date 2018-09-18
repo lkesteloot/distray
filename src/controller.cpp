@@ -29,43 +29,11 @@ static bool any_worker_working(const std::vector<RemoteWorker *> &remote_workers
     return false;
 }
 
+// Start the controller. Returns program exit code.
 int start_controller(const Parameters &parameters) {
-    // Create socket.
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1) {
-        perror("socket");
-        return -1;
-    }
-
-    // Make sure we can re-bind to this socket immediately shutting down last time.
-    int opt = 1;
-    int result = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    if (result == -1) {
-        perror("setsockopt");
-        return -1;
-    }
-    result = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
-    if (result == -1) {
-        perror("setsockopt");
-        return -1;
-    }
-
-    // Bind to our socket.
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY; // XXX Make address configurable.
-    addr.sin_port = htons(1120); // XXX Make port configurable.
-
-    result = bind(sockfd, (struct sockaddr *) &addr, sizeof(addr));
-    if (result == -1) {
-        perror("bind");
-        return -1;
-    }
-
-    // Listen for new connections.
-    result = listen(sockfd, 10);
-    if (result == -1) {
-        perror("listen");
+    int sock_fd = create_server_socket(1120); // XXX Make port configurable.
+    if (sock_fd == -1) {
+        perror("create_server_socket");
         return -1;
     }
 
@@ -75,13 +43,25 @@ int start_controller(const Parameters &parameters) {
     // Our list of remote workers.
     std::vector<RemoteWorker *> remote_workers;
 
+    // Start a worker connection for each proxy.
+    int proxy_fd = create_client_socket(1121); // XXX use port from parameters, default to 1121.
+    if (proxy_fd == -1) {
+        return -1;
+    }
+
+    {
+        RemoteWorker *remote_worker = new RemoteWorker(proxy_fd, parameters);
+        remote_workers.push_back(remote_worker);
+        remote_worker->start();
+    }
+
     // Keep going as long as there are frames to be done or workers working on frames.
     while (!frames.empty() || any_worker_working(remote_workers)) {
         // Poll entry for every worker, plus our listening socket.
         std::vector<struct pollfd> pollfds(1 + remote_workers.size());
 
         // Listening socket.
-        pollfds[0].fd = sockfd;
+        pollfds[0].fd = sock_fd;
         pollfds[0].events = POLLIN;
         pollfds[0].revents = 0;
 
@@ -91,7 +71,7 @@ int start_controller(const Parameters &parameters) {
         }
 
         // Wait for event on any file descriptor.
-        result = poll(pollfds.data(), pollfds.size(), -1);
+        int result = poll(pollfds.data(), pollfds.size(), -1);
         if (result == -1) {
             perror("poll");
             return -1;
@@ -108,7 +88,7 @@ int start_controller(const Parameters &parameters) {
                     // New connection from worker.
                     struct sockaddr_in remote_addr;
                     socklen_t remote_addr_len = sizeof(remote_addr);
-                    int connfd = accept(sockfd, (struct sockaddr *) &remote_addr, &remote_addr_len);
+                    int connfd = accept(sock_fd, (struct sockaddr *) &remote_addr, &remote_addr_len);
                     if (result == -1) {
                         perror("accept");
                         return -1;

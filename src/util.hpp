@@ -3,8 +3,8 @@
 
 #include <google/protobuf/message.h>
 
-int send_message(int sockfd, const google::protobuf::Message &request);
-int receive_message(int sockfd, google::protobuf::Message &response);
+int send_message(int sock_fd, const google::protobuf::Message &request);
+int receive_message(int sock_fd, google::protobuf::Message &response);
 
 // Whether a string includes a parameter ("%d" or "%0Nd").
 bool string_has_parameter(const std::string &str);
@@ -21,5 +21,11 @@ std::string read_file(const std::string &pathname);
 
 // Write a file from a string. Returns whether successful.
 bool write_file(const std::string &pathname, const std::string &content);
+
+// Create a server socket. Returns -1 (and sets errno) on failure, otherwise returns 0.
+int create_server_socket(int port);
+
+// Create a client socket. Returns -1 (and sets errno) on failure, otherwise returns 0.
+int create_client_socket(int port);
 
 #endif // UTIL_HPP

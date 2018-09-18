@@ -129,6 +129,7 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
 
         if (arg == "--password") {
             if (args.has_at_least(1)) {
+                // XXX handle password in all commands.
                 m_password = args.next();
             } else {
                 std::cerr << "Must specify password with --password flag.\n";

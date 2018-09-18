@@ -5,10 +5,12 @@
 #include <iomanip>
 #include <stdexcept>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "util.hpp"
 
-int send_message(int sockfd, const google::protobuf::Message &request) {
+int send_message(int sock_fd, const google::protobuf::Message &request) {
     // Serialize to bytes.
     uint32_t size = request.ByteSize();
     uint32_t full_size = size + sizeof(size);
@@ -17,18 +19,18 @@ int send_message(int sockfd, const google::protobuf::Message &request) {
     request.SerializeToArray(buf + sizeof(size), size);
 
     // Send.
-    int result = send(sockfd, buf, full_size, 0);
+    int result = send(sock_fd, buf, full_size, 0);
 
     delete[] buf;
 
     return result;
 }
 
-int receive_message(int sockfd, google::protobuf::Message &response) {
+int receive_message(int sock_fd, google::protobuf::Message &response) {
     uint32_t size;
 
     // Receive length.
-    int status = recv(sockfd, &size, sizeof(size), MSG_WAITALL);
+    int status = recv(sock_fd, &size, sizeof(size), MSG_WAITALL);
     if (status == -1) {
         perror("recv1");
         return status;
@@ -43,7 +45,7 @@ int receive_message(int sockfd, google::protobuf::Message &response) {
     uint8_t *buf = new uint8_t[size];
 
     // Receive.
-    status = recv(sockfd, buf, size, MSG_WAITALL);
+    status = recv(sock_fd, buf, size, MSG_WAITALL);
     if (status == -1) {
         perror("recv2");
     } else if (status != size) {
@@ -162,4 +164,77 @@ bool write_file(const std::string &pathname, const std::string &content) {
     f << content;
 
     return true;
+}
+
+int create_server_socket(int port) {
+    // Create socket.
+    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_fd == -1) {
+        perror("socket");
+        return -1;
+    }
+
+    // Make sure we can re-bind to this socket immediately shutting down last time.
+    int opt = 1;
+    int result = setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if (result == -1) {
+        perror("setsockopt (SO_REUSEADDR)");
+        return -1;
+    }
+    result = setsockopt(sock_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+    if (result == -1) {
+        perror("setsockopt (SO_REUSEPORT)");
+        return -1;
+    }
+
+    // Bind to our socket.
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY; // XXX Make address configurable.
+    addr.sin_port = htons(port);
+
+    result = bind(sock_fd, (struct sockaddr *) &addr, sizeof(addr));
+    if (result == -1) {
+        perror("bind");
+        return -1;
+    }
+
+    // Listen for new connections.
+    result = listen(sock_fd, 10);
+    if (result == -1) {
+        perror("listen");
+        return -1;
+    }
+
+    return sock_fd;
+}
+
+int create_client_socket(int port) {
+    // Create socket.
+    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_fd == -1) {
+        perror("socket");
+        return -1;
+    }
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    int result = inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr); // XXX use hostname from parameter.
+    if (result == -1) {
+        perror("inet_pton");
+        return -1;
+    } else if (result == 0) {
+        std::cerr << "Failed to parse address.\n";
+        // XXX Need to set errno.
+        return -1;
+    }
+
+    result = connect(sock_fd, (struct sockaddr *) &addr, sizeof(addr));
+    if (result == -1) {
+        perror("connect");
+        return -1;
+    }
+
+    return sock_fd;
 }

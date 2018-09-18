@@ -2,6 +2,7 @@
 #define OUTGOING_BUFFER_HPP
 
 #include <sys/socket.h>
+#include <google/protobuf/message.h>
 
 // Represents data that needs to be sent asynchronously.
 class OutgoingBuffer {

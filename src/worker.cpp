@@ -4,7 +4,6 @@
 #include <cstring>
 #include <errno.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include "worker.hpp"
 #include "Drp.pb.h"
@@ -106,29 +105,10 @@ static void handle_copy_out(const Drp::CopyOutRequest &request, Drp::CopyOutResp
     }
 }
 
+// Start a worker. Returns program exit code.
 int start_worker(const Parameters &parameters) {
-    // Create socket.
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    int sockfd = create_client_socket(1122); // XXX use port from parameters, default to 1120.
     if (sockfd == -1) {
-        perror("socket");
-        return -1;
-    }
-
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(1120);
-    int result = inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
-    if (result == -1) {
-        perror("inet_pton");
-        return -1;
-    } else if (result == 0) {
-        std::cerr << "Failed to parse address.\n";
-        return -1;
-    }
-
-    result = connect(sockfd, (struct sockaddr *) &addr, sizeof(addr));
-    if (result == -1) {
-        perror("connect");
         return -1;
     }
 
@@ -136,7 +116,7 @@ int start_worker(const Parameters &parameters) {
         Drp::Request request;
         Drp::Response response;
 
-        result = receive_message(sockfd, request);
+        int result = receive_message(sockfd, request);
         if (result == -1) {
             perror("receive_message_sock");
             return -1;

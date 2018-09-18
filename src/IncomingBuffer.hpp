@@ -2,6 +2,7 @@
 #define INCOMING_BUFFER_HPP
 
 #include <sys/socket.h>
+#include <google/protobuf/message.h>
 
 // Buffer that accumulates bytes until enough are ready to receive a message.
 class IncomingBuffer {
@@ -79,6 +80,7 @@ public:
             m_received += received_here;
             if (m_received == sizeof(m_size)) {
                 m_size = ntohl(m_size);
+                // XXX Fail if size is too large (> 10 MB?).
                 m_have_size = true;
                 m_received = 0;
 

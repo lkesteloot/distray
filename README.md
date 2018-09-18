@@ -32,7 +32,7 @@ executable bits set, and this cannot be done through the copying
 mechanism.
 
 By default there is no access control, and if anyone knows that you're
-running a proxy, then can connect to it and control your workers.
+running a proxy, they can connect to it and control your workers.
 Use a password (specified with the `--password` flag) to limit who
 can connect to proxies or to the controller.
 
@@ -55,9 +55,9 @@ Flags are:
 
 A proxy lets both workers and controllers connect to it. It's useful
 when neither the workers nor the controller can connect to each other.
-For example, you may have some workers on an AWS EC2 machine and the
+For example, you may have some workers on AWS EC2 machines and the
 controller on a home machine, and it's easiest to run a proxy on
-some public machine that you have access to.
+some public machine that both have access to.
 
     % distrend proxy [FLAGS]
 
@@ -131,7 +131,7 @@ And the controller on your home machine:
 
     % distrend controller \
         --proxy proxy.example.com \
-        --in Scene.proto Scene.proto \
+        --in marbles.scene marbles.scene \
         --out anim/out-%03.png anim/out-%03.png \
         0,199 \
         build/ray %d anim/out 1000
@@ -147,7 +147,7 @@ the hostname of the controller:
 And run the controller on that machine:
 
     % distrend controller \
-        --in Scene.proto Scene.proto \
+        --in marbles.scene marbles.scene \
         --out anim/out-%03.png anim/out-%03.png \
         0,199 \
         build/ray %d anim/out 1000
