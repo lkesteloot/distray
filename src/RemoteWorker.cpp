@@ -20,6 +20,8 @@ void RemoteWorker::dispatch() {
                 m_hostname = response.welcome_response().hostname();
                 std::cout << "hostname: " << m_hostname <<
                     ", cores: " << response.welcome_response().core_count() << "\n";
+                // We're no longer unused as a proxy connection:
+                m_proxy_index = -1;
                 m_state_index = 0;
                 m_state = SEND_COPY_IN_NON_FRAME_FILE;
                 break;

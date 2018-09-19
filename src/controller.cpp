@@ -1,6 +1,7 @@
 
 #include <netinet/in.h>
 #include <poll.h>
+#include <set>
 
 #include "controller.hpp"
 #include "Drp.pb.h"
@@ -43,20 +44,38 @@ int start_controller(const Parameters &parameters) {
     // Our list of remote workers.
     std::vector<RemoteWorker *> remote_workers;
 
-    // Start a worker connection for each proxy.
-    int proxy_fd = create_client_socket(1121); // XXX use port from parameters, default to 1121.
-    if (proxy_fd == -1) {
-        return -1;
-    }
-
-    {
-        RemoteWorker *remote_worker = new RemoteWorker(proxy_fd, parameters);
-        remote_workers.push_back(remote_worker);
-        remote_worker->start();
-    }
-
     // Keep going as long as there are frames to be done or workers working on frames.
     while (!frames.empty() || any_worker_working(remote_workers)) {
+        // Create blocking (non-connected) connections to proxies, if necessary.
+        std::set<int> proxy_indices;
+
+        // Fill with every index to start with.
+        for (int proxy_index = 0; proxy_index < parameters.m_proxy_urls.size(); proxy_index++) {
+            proxy_indices.insert(proxy_index);
+        }
+
+        // Remove the ones that we have a connection to.
+        for (RemoteWorker *remote_worker : remote_workers) {
+            int proxy_index = remote_worker->get_proxy_index();
+            if (proxy_index != -1) {
+                proxy_indices.erase(proxy_index);
+            }
+        }
+
+        // Whatever's left, create a connection for.
+        for (int proxy_index : proxy_indices) {
+            // Start a worker connection for each proxy.
+            int proxy_fd = create_client_socket(1121); // XXX use port from parameters, default to 1121.
+            if (proxy_fd == -1) {
+                return -1;
+            }
+
+            RemoteWorker *remote_worker = new RemoteWorker(proxy_fd, parameters);
+            remote_worker->set_proxy_index(proxy_index);
+            remote_worker->start();
+            remote_workers.push_back(remote_worker);
+        }
+
         // Poll entry for every worker, plus our listening socket.
         std::vector<struct pollfd> pollfds(1 + remote_workers.size());
 

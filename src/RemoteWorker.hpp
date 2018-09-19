@@ -59,6 +59,9 @@ public:
     // Whatever frame we're working on, or -1 for none.
     int m_frame;
 
+    // Index of proxy we're blocked for, or -1 for none.
+    int m_proxy_index;
+
     // Buffer for outgoing and incoming messages.
     OutgoingBuffer m_outgoing_buffer;
     IncomingBuffer m_incoming_buffer;
@@ -68,7 +71,7 @@ public:
 
     RemoteWorker(int fd, const Parameters &parameters)
         : m_fd(fd), m_state(SEND_WELCOME_REQUEST), m_state_index(0), m_parameters(parameters),
-            m_frame(-1), m_outgoing_buffer(fd), m_incoming_buffer(fd) {
+            m_frame(-1), m_proxy_index(-1), m_outgoing_buffer(fd), m_incoming_buffer(fd) {
 
         // Nothing.
     }
@@ -81,6 +84,16 @@ public:
     // Get the hostname. Might be empty if we've not gotten a welcome response.
     const std::string &hostname() const {
         return m_hostname;
+    }
+
+    // Set the index of the proxy (in the m_proxy_urls list) we're blocked for.
+    void set_proxy_index(int proxy_index) {
+        m_proxy_index = proxy_index;
+    }
+
+    // Get the index of the proxy (in the m_proxy_urls list) we're blocked for.
+    int get_proxy_index() const {
+        return m_proxy_index;
     }
 
     // Fill the structure for poll().
