@@ -10,6 +10,15 @@
 
 #include "util.hpp"
 
+bool Endpoint::set(const std::string &endpoint, bool is_server,
+        const std::string &default_hostname, int default_port) {
+
+    m_endpoint = endpoint;
+
+    return parse_and_lookup_endpoint(m_endpoint, is_server,
+            default_hostname, default_port, m_sockaddr);
+}
+
 int send_message(int sock_fd, const google::protobuf::Message &request) {
     // Serialize to bytes.
     uint32_t size = request.ByteSize();
@@ -166,7 +175,7 @@ bool write_file(const std::string &pathname, const std::string &content) {
     return true;
 }
 
-int create_server_socket(int port) {
+int create_server_socket(const Endpoint &endpoint) {
     // Create socket.
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd == -1) {
@@ -188,12 +197,7 @@ int create_server_socket(int port) {
     }
 
     // Bind to our socket.
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY; // XXX Make address configurable.
-    addr.sin_port = htons(port);
-
-    result = bind(sock_fd, (struct sockaddr *) &addr, sizeof(addr));
+    result = bind(sock_fd, (struct sockaddr *) &endpoint.m_sockaddr, sizeof(endpoint.m_sockaddr));
     if (result == -1) {
         perror("bind");
         return -1;
@@ -209,7 +213,7 @@ int create_server_socket(int port) {
     return sock_fd;
 }
 
-int create_client_socket(int port) {
+int create_client_socket(const Endpoint &endpoint) {
     // Create socket.
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd == -1) {
@@ -217,20 +221,8 @@ int create_client_socket(int port) {
         return -1;
     }
 
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    int result = inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr); // XXX use hostname from parameter.
-    if (result == -1) {
-        perror("inet_pton");
-        return -1;
-    } else if (result == 0) {
-        std::cerr << "Failed to parse address.\n";
-        // XXX Need to set errno.
-        return -1;
-    }
-
-    result = connect(sock_fd, (struct sockaddr *) &addr, sizeof(addr));
+    int result = connect(sock_fd, (struct sockaddr *) &endpoint.m_sockaddr,
+            sizeof(endpoint.m_sockaddr));
     if (result == -1) {
         perror("connect");
         return -1;

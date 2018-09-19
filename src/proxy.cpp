@@ -232,15 +232,15 @@ static void close_connection(std::vector<Connection *> &connections, Connection 
 int start_proxy(const Parameters &parameters) {
     g_tmp_buffer = new uint8_t[TMP_BUFFER_SIZE];
 
-    // Listen for workers. XXX should be 1120:
-    int worker_server_fd = create_server_socket(1122); // XXX Make port configurable.
+    // Listen for workers.
+    int worker_server_fd = create_server_socket(parameters.m_worker_endpoint);
     if (worker_server_fd == -1) {
         perror("create_server_socket (worker)");
         return -1;
     }
 
     // Listen for controllers.
-    int controller_server_fd = create_server_socket(1121); // XXX Make port configurable.
+    int controller_server_fd = create_server_socket(parameters.m_controller_endpoint);
     if (controller_server_fd == -1) {
         perror("create_server_socket (controller)");
         return -1;

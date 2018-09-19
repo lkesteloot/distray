@@ -40,28 +40,6 @@ struct FileCopy {
     }
 };
 
-// Represents both an endpoint string (like "example.com:1120") and its
-// parsed and looked-up address.
-class Endpoint {
-public:
-    std::string m_endpoint;
-    struct sockaddr_in m_sockaddr;
-
-    Endpoint() {
-        // Nothing.
-    }
-
-    // Returns whether successful.
-    bool set(const std::string &endpoint, bool is_server,
-            const std::string &default_hostname, int default_port) {
-
-        m_endpoint = endpoint;
-
-        return parse_and_lookup_endpoint(m_endpoint, is_server,
-                default_hostname, default_port, m_sockaddr);
-    }
-};
-
 // All command-line parameters.
 class Parameters {
 public:

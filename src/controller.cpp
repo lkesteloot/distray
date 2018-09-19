@@ -32,7 +32,7 @@ static bool any_worker_working(const std::vector<RemoteWorker *> &remote_workers
 
 // Start the controller. Returns program exit code.
 int start_controller(const Parameters &parameters) {
-    int sock_fd = create_server_socket(1120); // XXX Make port configurable.
+    int sock_fd = create_server_socket(parameters.m_endpoint);
     if (sock_fd == -1) {
         perror("create_server_socket");
         return -1;
@@ -65,7 +65,7 @@ int start_controller(const Parameters &parameters) {
         // Whatever's left, create a connection for.
         for (int proxy_index : proxy_indices) {
             // Start a worker connection for each proxy.
-            int proxy_fd = create_client_socket(1121); // XXX use port from parameters, default to 1121.
+            int proxy_fd = create_client_socket(parameters.m_proxy_endpoints[proxy_index]);
             if (proxy_fd == -1) {
                 return -1;
             }

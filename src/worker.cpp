@@ -107,7 +107,7 @@ static void handle_copy_out(const Drp::CopyOutRequest &request, Drp::CopyOutResp
 
 // Start a worker. Returns program exit code.
 int start_worker(const Parameters &parameters) {
-    int sockfd = create_client_socket(1122); // XXX use port from parameters, default to 1120.
+    int sockfd = create_client_socket(parameters.m_endpoint);
     if (sockfd == -1) {
         return -1;
     }

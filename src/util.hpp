@@ -4,6 +4,22 @@
 #include <netdb.h>
 #include <google/protobuf/message.h>
 
+// Represents both an endpoint string (like "example.com:1120") and its
+// parsed and looked-up address.
+class Endpoint {
+public:
+    std::string m_endpoint;
+    struct sockaddr_in m_sockaddr;
+
+    Endpoint() {
+        // Nothing.
+    }
+
+    // Returns whether successful.
+    bool set(const std::string &endpoint, bool is_server,
+            const std::string &default_hostname, int default_port);
+};
+
 int send_message(int sock_fd, const google::protobuf::Message &request);
 int receive_message(int sock_fd, google::protobuf::Message &response);
 
@@ -24,10 +40,10 @@ std::string read_file(const std::string &pathname);
 bool write_file(const std::string &pathname, const std::string &content);
 
 // Create a server socket. Returns -1 (and sets errno) on failure, otherwise returns 0.
-int create_server_socket(int port);
+int create_server_socket(const Endpoint &endpoint);
 
 // Create a client socket. Returns -1 (and sets errno) on failure, otherwise returns 0.
-int create_client_socket(int port);
+int create_client_socket(const Endpoint &endpoint);
 
 // Parse a "hostname:port" string into a hostname and port. Also accepts
 // ":port" (blank hostname), "port" (default hostname), "hostname:" (default
