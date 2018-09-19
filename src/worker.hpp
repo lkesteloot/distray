@@ -3,6 +3,6 @@
 
 #include "Parameters.hpp"
 
-int start_worker(const Parameters &parameters);
+int start_worker(Parameters &parameters);
 
 #endif // WORKER_HPP

@@ -3,6 +3,6 @@
 
 #include "Parameters.hpp"
 
-int start_controller(const Parameters &parameters);
+int start_controller(Parameters &parameters);
 
 #endif // CONTROLLER_HPP

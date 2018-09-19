@@ -31,7 +31,21 @@ static bool any_worker_working(const std::vector<RemoteWorker *> &remote_workers
 }
 
 // Start the controller. Returns program exit code.
-int start_controller(const Parameters &parameters) {
+int start_controller(Parameters &parameters) {
+    // Resolve endpoints.
+    bool success = parameters.m_endpoint.resolve(true, "", DEFAULT_WORKER_PORT);
+    if (!success) {
+        // XXX Handle.
+        return -1;
+    }
+    for (Endpoint &endpoint : parameters.m_proxy_endpoints) {
+        success = endpoint.resolve(false, "", DEFAULT_CONTROLLER_PORT);
+        if (!success) {
+            // XXX Handle.
+            return -1;
+        }
+    }
+
     int sock_fd = create_server_socket(parameters.m_endpoint);
     if (sock_fd == -1) {
         perror("create_server_socket");
@@ -117,7 +131,7 @@ int start_controller(const Parameters &parameters) {
                     remote_workers.push_back(remote_worker);
                     remote_worker->start();
                 } else {
-                    bool success = remote_workers[i - 1]->receive();
+                    success = remote_workers[i - 1]->receive();
                     if (!success) {
                         perror("worker receive");
                         return -1;
@@ -129,7 +143,7 @@ int start_controller(const Parameters &parameters) {
             if ((revents & POLLOUT) != 0) {
                 // Can't ever write to listening socket.
                 if (i > 0) {
-                    bool success = remote_workers[i - 1]->send();
+                    success = remote_workers[i - 1]->send();
                     if (!success) {
                         perror("worker send");
                         return -1;

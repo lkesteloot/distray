@@ -229,8 +229,20 @@ static void close_connection(std::vector<Connection *> &connections, Connection 
 }
 
 // Serve up our proxy. Returns program exit code.
-int start_proxy(const Parameters &parameters) {
+int start_proxy(Parameters &parameters) {
     g_tmp_buffer = new uint8_t[TMP_BUFFER_SIZE];
+
+    // Resolve endpoints.
+    bool success = parameters.m_worker_endpoint.resolve(true, "", DEFAULT_WORKER_PORT);
+    if (!success) {
+        // XXX Handle.
+        return -1;
+    }
+    success = parameters.m_controller_endpoint.resolve(true, "", DEFAULT_CONTROLLER_PORT);
+    if (!success) {
+        // XXX Handle.
+        return -1;
+    }
 
     // Listen for workers.
     int worker_server_fd = create_server_socket(parameters.m_worker_endpoint);
@@ -333,7 +345,7 @@ int start_proxy(const Parameters &parameters) {
                         std::cerr << "Did not find incoming fd " << fd << "\n";
                         exit(-1);
                     } else {
-                        bool success = connection->receive(fd);
+                        success = connection->receive(fd);
                         if (!success) {
                             if (errno == ECONNRESET) {
                                 // Other side disconnected.
@@ -359,7 +371,7 @@ int start_proxy(const Parameters &parameters) {
                         std::cerr << "Did not find outgoing fd " << fd << "\n";
                         exit(-1);
                     } else {
-                        bool success = connection->send(fd);
+                        success = connection->send(fd);
                         if (!success) {
                             perror("connection send");
                             return -1;

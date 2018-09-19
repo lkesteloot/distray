@@ -143,13 +143,7 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
                 return 1;
             }
             if (args.has_at_least(1)) {
-                Endpoint proxy_endpoint;
-                bool success = proxy_endpoint.set(args.next(), false, "", DEFAULT_CONTROLLER_PORT);
-                if (!success) {
-                    // XXX Handle.
-                    return 1;
-                }
-                m_proxy_endpoints.push_back(proxy_endpoint);
+                m_proxy_endpoints.push_back(Endpoint(args.next()));
             } else {
                 std::cerr << "Must specify proxy endpoint with --proxy flag.\n";
                 return 1;
@@ -189,11 +183,7 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
                 return 1;
             }
             if (args.has_at_least(1)) {
-                bool success = m_endpoint.set(args.next(), true, "", DEFAULT_WORKER_PORT);
-                if (!success) {
-                    // XXX Handle.
-                    return 1;
-                }
+                m_endpoint.set(args.next());
             } else {
                 std::cerr << "Must specify listen endpoint with --listen flag.\n";
                 return 1;
@@ -204,11 +194,7 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
                 return 1;
             }
             if (args.has_at_least(1)) {
-                bool success = m_worker_endpoint.set(args.next(), true, "", DEFAULT_WORKER_PORT);
-                if (!success) {
-                    // XXX Handle.
-                    return 1;
-                }
+                m_worker_endpoint.set(args.next());
             } else {
                 std::cerr << "Must specify listen endpoint with --worker-listen flag.\n";
                 return 1;
@@ -219,12 +205,7 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
                 return 1;
             }
             if (args.has_at_least(1)) {
-                bool success = m_controller_endpoint.set(args.next(),
-                        true, "", DEFAULT_CONTROLLER_PORT);
-                if (!success) {
-                    // XXX Handle.
-                    return 1;
-                }
+                m_controller_endpoint.set(args.next());
             } else {
                 std::cerr << "Must specify listen endpoint with --controller-listen flag.\n";
                 return 1;
@@ -238,7 +219,7 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
     // Parse non-flag parameters.
     if (m_command == CMD_WORKER) {
         if (args.has_exactly(1)) {
-            m_endpoint.set(args.next(), false, "", DEFAULT_WORKER_PORT);
+            m_endpoint.set(args.next());
         } else {
             std::cerr << "The worker command must specify the endpoint to connect to.\n";
             return 1;

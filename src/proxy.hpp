@@ -3,6 +3,6 @@
 
 #include "Parameters.hpp"
 
-int start_proxy(const Parameters &parameters);
+int start_proxy(Parameters &parameters);
 
 #endif // PROXY_HPP

@@ -10,11 +10,7 @@
 
 #include "util.hpp"
 
-bool Endpoint::set(const std::string &endpoint, bool is_server,
-        const std::string &default_hostname, int default_port) {
-
-    m_endpoint = endpoint;
-
+bool Endpoint::resolve(bool is_server, const std::string &default_hostname, int default_port) {
     return parse_and_lookup_endpoint(m_endpoint, is_server,
             default_hostname, default_port, m_sockaddr);
 }

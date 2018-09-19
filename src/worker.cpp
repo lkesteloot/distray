@@ -106,12 +106,21 @@ static void handle_copy_out(const Drp::CopyOutRequest &request, Drp::CopyOutResp
 }
 
 // Start a worker. Returns program exit code.
-int start_worker(const Parameters &parameters) {
+int start_worker(Parameters &parameters) {
+    // Resolve endpoint.
+    bool success = parameters.m_endpoint.resolve(false, "", DEFAULT_WORKER_PORT);
+    if (!success) {
+        // XXX Handle.
+        return -1;
+    }
+
+    // Connect to the controller or the proxy.
     int sockfd = create_client_socket(parameters.m_endpoint);
     if (sockfd == -1) {
         return -1;
     }
 
+    // Keep taking work to do.
     for (;;) {
         Drp::Request request;
         Drp::Response response;

@@ -15,9 +15,18 @@ public:
         // Nothing.
     }
 
+    Endpoint(const std::string &endpoint)
+        : m_endpoint(endpoint) {
+
+        // Nothing.
+    }
+
+    void set(const std::string &endpoint) {
+        m_endpoint = endpoint;
+    }
+
     // Returns whether successful.
-    bool set(const std::string &endpoint, bool is_server,
-            const std::string &default_hostname, int default_port);
+    bool resolve(bool is_server, const std::string &default_hostname, int default_port);
 };
 
 int send_message(int sock_fd, const google::protobuf::Message &request);
