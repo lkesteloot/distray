@@ -238,3 +238,127 @@ int create_client_socket(int port) {
 
     return sock_fd;
 }
+
+// Parses a non-negative decimal integer. Returns -1 if the string is not
+// entirely made of a non-negative integer.
+static int parse_integer(const char *s) {
+    // Quick check if the start is okay. Also eliminates empty strings and
+    // negative numbers.
+    if (*s < '0' || *s > '9') {
+        return -1;
+    }
+
+    char *end;
+    int value = strtol(s, &end, 10);
+
+    // See if we reached the end of the string.
+    return *end == '\0' ? value : -1;
+}
+
+bool parse_endpoint(const std::string &endpoint,
+        const std::string &default_hostname, int default_port,
+        std::string &hostname, int &port) {
+
+    // Set defaults.
+    hostname = default_hostname;
+    port = default_port;
+
+    // Split the endpoint.
+    const char *endpoint_s = endpoint.c_str();
+    const char *c = strchr(endpoint_s, ':');
+    if (c == nullptr) {
+        // No colon. Could be a hostname or a port. First try to parse it as an
+        // integer.
+        int possible_port = parse_integer(endpoint_s);
+        if (possible_port >= 0) {
+            // Valid integer.
+            port = possible_port;
+        } else {
+            // Invalid integer. Assume it's a hostname.
+            if (!endpoint.empty()) {
+                hostname = endpoint;
+            }
+        }
+    } else {
+        // Split at the colon.
+        hostname = std::string(endpoint_s, c - endpoint_s);
+
+        // Parse the port.
+        if (c[1] != '\0') {
+            // Only set the port if it's non-empty. Otherwise keep default.
+            int possible_port = parse_integer(c + 1);
+            if (possible_port >= 0) {
+                // Valid port.
+                port = possible_port;
+            } else {
+                // Bad port, fail.
+                // XXX handle.
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool do_dns_lookup(const std::string &hostname, int port, bool is_server,
+        struct sockaddr_in &sockaddr) {
+
+    // Convert port to string the dumb C++ way.
+    std::stringstream port_stream;
+    port_stream << port;
+    std::string port_str = port_stream.str();
+
+    // Configure the hints for the DNS lookup.
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = (is_server ? AI_PASSIVE : 0);
+
+    // Pass in null for an empty string, which either means "any address" when
+    // serving or "loopback" when connecting.
+    const char *hostname_s = hostname.empty() ? nullptr : hostname.c_str();
+
+    // Do the actual lookup.
+    struct addrinfo *res;
+    int error = getaddrinfo(hostname_s, port_str.c_str(), &hints, &res);
+    if (error != 0) {
+        // XXX Handle.
+        std::cerr << "DNS failed for " << hostname_s << ": " << gai_strerror(error) << "\n";
+        return false;
+    }
+
+    if (res == nullptr) {
+        // Failed to look up hostname.
+        // XXX handle. I don't know if this ever happens.
+        return false;
+    }
+
+    if (res->ai_addrlen != sizeof(sockaddr_in)) {
+        std::cerr << "do_dns_lookup: address structure is wrong size (" << res->ai_addrlen << ")\n";
+        return false;
+    }
+
+    // Just take the first option.
+    sockaddr = *((struct sockaddr_in *) res->ai_addr);
+
+    freeaddrinfo(res);
+
+    return true;
+}
+
+bool parse_and_lookup_endpoint(const std::string &endpoint,
+        bool is_server,
+        const std::string &default_hostname,
+        int default_port,
+        struct sockaddr_in &sockaddr) {
+
+    std::string hostname;
+    int port;
+
+    return
+        parse_endpoint(endpoint, default_hostname, default_port, hostname, port) &&
+        do_dns_lookup(hostname, port, is_server, sockaddr);
+}

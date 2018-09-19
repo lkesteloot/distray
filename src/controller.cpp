@@ -50,7 +50,7 @@ int start_controller(const Parameters &parameters) {
         std::set<int> proxy_indices;
 
         // Fill with every index to start with.
-        for (int proxy_index = 0; proxy_index < parameters.m_proxy_urls.size(); proxy_index++) {
+        for (int proxy_index = 0; proxy_index < parameters.m_proxy_endpoints.size(); proxy_index++) {
             proxy_indices.insert(proxy_index);
         }
 

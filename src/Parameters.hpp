@@ -7,8 +7,9 @@
 #include "Frames.hpp"
 #include "util.hpp"
 
-// Default port we listen to or connect to.
-static const int DEFAULT_PORT = 1120;
+// Default ports we listen to or connect to.
+static const int DEFAULT_WORKER_PORT = 1120;
+static const int DEFAULT_CONTROLLER_PORT = 1121;
 
 // Command that we're running.
 enum Command {
@@ -39,6 +40,28 @@ struct FileCopy {
     }
 };
 
+// Represents both an endpoint string (like "example.com:1120") and its
+// parsed and looked-up address.
+class Endpoint {
+public:
+    std::string m_endpoint;
+    struct sockaddr_in m_sockaddr;
+
+    Endpoint() {
+        // Nothing.
+    }
+
+    // Returns whether successful.
+    bool set(const std::string &endpoint, bool is_server,
+            const std::string &default_hostname, int default_port) {
+
+        m_endpoint = endpoint;
+
+        return parse_and_lookup_endpoint(m_endpoint, is_server,
+                default_hostname, default_port, m_sockaddr);
+    }
+};
+
 // All command-line parameters.
 class Parameters {
 public:
@@ -48,14 +71,15 @@ public:
     // For all commands.
     std::string m_password;
 
-    // For CMD_WORKER (outgoing); and CMD_PROXY and CMD_CONTROLLER (incoming).
-    std::string m_url;
+    // For CMD_WORKER (outgoing) and CMD_CONTROLLER (incoming).
+    Endpoint m_endpoint;
 
     // For CMD_PROXY.
-    // (None.)
+    Endpoint m_worker_endpoint;
+    Endpoint m_controller_endpoint;
 
     // For CMD_CONTROLLER.
-    std::vector<std::string> m_proxy_urls;
+    std::vector<Endpoint> m_proxy_endpoints;
     std::vector<FileCopy> m_in_copies;
     std::vector<FileCopy> m_out_copies;
     Frames m_frames;

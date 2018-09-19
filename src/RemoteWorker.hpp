@@ -86,12 +86,12 @@ public:
         return m_hostname;
     }
 
-    // Set the index of the proxy (in the m_proxy_urls list) we're blocked for.
+    // Set the index of the proxy (in the m_proxy_endpoints list) we're blocked for.
     void set_proxy_index(int proxy_index) {
         m_proxy_index = proxy_index;
     }
 
-    // Get the index of the proxy (in the m_proxy_urls list) we're blocked for.
+    // Get the index of the proxy (in the m_proxy_endpoints list) we're blocked for.
     int get_proxy_index() const {
         return m_proxy_index;
     }

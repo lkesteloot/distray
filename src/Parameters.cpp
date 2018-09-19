@@ -61,15 +61,18 @@ void Parameters::usage() const {
     std::cerr << "\n";
     std::cerr << "Commands:\n";
     std::cerr << "\n";
-    std::cerr << "    worker [FLAGS] URL\n";
-    std::cerr << "        The URL of either a proxy or a controller (tcp://HOSTNAME:PORT).\n";
+    std::cerr << "    worker [FLAGS] ENDPOINT\n";
+    std::cerr << "        The ENDPOINT of either a proxy or a controller [:" << DEFAULT_WORKER_PORT << "].\n";
     std::cerr << "        --password PASSWORD Password to pass to proxies or the controller.\n";
     std::cerr << "                   Defaults to an empty string.\n";
     std::cerr << "\n";
     std::cerr << "    proxy [FLAGS]\n";
-    std::cerr << "        --password     PASSWORD Password to expect from workers or the\n";
-    std::cerr << "                       controller. Defaults to an empty string.\n";
-    std::cerr << "        --listen URL   URL to listen on [tcp://:1120].\n";
+    std::cerr << "        --password PASSWORD           Password to expect from workers or the\n";
+    std::cerr << "                                      controller. Defaults to an empty string.\n";
+    std::cerr << "        --worker-listen ENDPOINT      ENDPOINT to listen for workers on [:"
+        << DEFAULT_WORKER_PORT << "].\n";
+    std::cerr << "        --controller-listen ENDPOINT  ENDPOINT to listen for controllers on [:"
+        << DEFAULT_CONTROLLER_PORT << "].\n";
     std::cerr << "\n";
     std::cerr << "    controller [FLAGS] FRAMES EXEC [PARAMETERS...]\n";
     std::cerr << "        FRAMES is a frame range specification: FIRST[,LAST[,STEP]],\n";
@@ -79,12 +82,17 @@ void Parameters::usage() const {
     std::cerr << "        PARAMETERS are the parameters to pass to the executed binary.\n";
     std::cerr << "        Use %d or %0Nd for the frame number, where N is a positive\n";
     std::cerr << "        decimal integer that specifies field width.\n";
-    std::cerr << "        --proxy URL         Proxy URL to connect to. Can be repeated.\n";
+    std::cerr << "        --proxy ENDPOINT    Proxy ENDPOINT to connect to [:"
+        << DEFAULT_CONTROLLER_PORT << "]. Can be repeated.\n";
     std::cerr << "        --in LOCAL REMOTE   Copy LOCAL file to REMOTE file. Can be repeated.\n";
     std::cerr << "        --out REMOTE LOCAL  Copy REMOTE file to LOCAL file. Can be repeated.\n";
     std::cerr << "        --password PASSWORD Password to expect from workers or to pass\n";
     std::cerr << "                            to proxies. Defaults to an empty string.\n";
-    std::cerr << "        --listen URL        URL to listen on [tcp://:1120].\n";
+    std::cerr << "        --listen ENDPOINT   ENDPOINT to listen on [:"
+        << DEFAULT_WORKER_PORT << "].\n";
+    std::cerr << "\n";
+    std::cerr << "ENDPOINTs are specified as HOSTNAME:PORT, where in some cases the\n";
+    std::cerr << "HOSTNAME or the PORT have a default value.\n";
 }
 
 // Fills parameters and returns 0 on success; otherwise returns program exit status.
@@ -118,12 +126,6 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
         return 1;
     }
 
-    // Default value for incoming URL.
-    if (m_command == CMD_PROXY || m_command == CMD_CONTROLLER) {
-        // Listen on all IPv4 interfaces.
-        m_url = "tcp://:1120";
-    }
-
     while (args.next_is_flag()) {
         arg = args.next();
 
@@ -141,9 +143,15 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
                 return 1;
             }
             if (args.has_at_least(1)) {
-                m_proxy_urls.push_back(args.next());
+                Endpoint proxy_endpoint;
+                bool success = proxy_endpoint.set(args.next(), false, "", DEFAULT_CONTROLLER_PORT);
+                if (!success) {
+                    // XXX Handle.
+                    return 1;
+                }
+                m_proxy_endpoints.push_back(proxy_endpoint);
             } else {
-                std::cerr << "Must specify proxy URL with --proxy flag.\n";
+                std::cerr << "Must specify proxy endpoint with --proxy flag.\n";
                 return 1;
             }
         } else if (arg == "--in" || arg == "--out") {
@@ -176,14 +184,49 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
                 return 1;
             }
         } else if (arg == "--listen") {
-            if (m_command == CMD_WORKER) {
-                std::cerr << "The --listen flag is not valid for the worker command.\n";
+            if (m_command != CMD_CONTROLLER) {
+                std::cerr << "The --listen flag is only valid for the controller command.\n";
                 return 1;
             }
             if (args.has_at_least(1)) {
-                m_url = args.next();
+                bool success = m_endpoint.set(args.next(), true, "", DEFAULT_WORKER_PORT);
+                if (!success) {
+                    // XXX Handle.
+                    return 1;
+                }
             } else {
-                std::cerr << "Must specify listen URL with --listen flag.\n";
+                std::cerr << "Must specify listen endpoint with --listen flag.\n";
+                return 1;
+            }
+        } else if (arg == "--worker-listen") {
+            if (m_command != CMD_PROXY) {
+                std::cerr << "The --worker-listen flag is only valid for the proxy command.\n";
+                return 1;
+            }
+            if (args.has_at_least(1)) {
+                bool success = m_worker_endpoint.set(args.next(), true, "", DEFAULT_WORKER_PORT);
+                if (!success) {
+                    // XXX Handle.
+                    return 1;
+                }
+            } else {
+                std::cerr << "Must specify listen endpoint with --worker-listen flag.\n";
+                return 1;
+            }
+        } else if (arg == "--controller-listen") {
+            if (m_command != CMD_PROXY) {
+                std::cerr << "The --worker-listen flag is only valid for the proxy command.\n";
+                return 1;
+            }
+            if (args.has_at_least(1)) {
+                bool success = m_controller_endpoint.set(args.next(),
+                        true, "", DEFAULT_CONTROLLER_PORT);
+                if (!success) {
+                    // XXX Handle.
+                    return 1;
+                }
+            } else {
+                std::cerr << "Must specify listen endpoint with --controller-listen flag.\n";
                 return 1;
             }
         } else {
@@ -195,9 +238,9 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
     // Parse non-flag parameters.
     if (m_command == CMD_WORKER) {
         if (args.has_exactly(1)) {
-            m_url = args.next();
+            m_endpoint.set(args.next(), false, "", DEFAULT_WORKER_PORT);
         } else {
-            std::cerr << "The worker command must specify the URL to connect to.\n";
+            std::cerr << "The worker command must specify the endpoint to connect to.\n";
             return 1;
         }
     } else if (m_command == CMD_PROXY) {

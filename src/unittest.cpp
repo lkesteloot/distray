@@ -5,6 +5,13 @@
 #include "unittest.hpp"
 #include "util.hpp"
 
+// Color escapes.
+static const char *PASS = "\033[32m";
+static const char *FAIL = "\033[31m";
+static const char *NEUTRAL = "\033[0m";
+
+// ------------------------------------------------------------------------------------------
+
 struct PathnameHasParameter {
     std::string m_str;
     bool m_expected;
@@ -20,7 +27,7 @@ static std::vector<PathnameHasParameter> m_has_parameter = {
     { "image-% 3d.png", false },
 };
 
-static int test_has_parameter() {
+static bool test_has_parameter() {
     std::cerr << "test_has_parameter:\n";
 
     for (PathnameHasParameter &p : m_has_parameter) {
@@ -28,15 +35,17 @@ static int test_has_parameter() {
 
         bool actual = string_has_parameter(p.m_str);
         if (actual == p.m_expected) {
-            std::cerr << "pass\n";
+            std::cerr << PASS << "pass" << NEUTRAL << "\n";
         } else {
-            std::cerr << "FAIL\n";
-            return 1;
+            std::cerr << FAIL << "FAIL" << NEUTRAL << "\n";
+            return false;
         }
     }
 
-    return 0;
+    return true;
 }
+
+// ------------------------------------------------------------------------------------------
 
 struct SubstituteParameter {
     std::string m_str;
@@ -58,7 +67,7 @@ static std::vector<SubstituteParameter> m_substitute_parameter {
     { "%%", 123, "%%" },
 };
 
-static int test_substitute_parameter() {
+static bool test_substitute_parameter() {
 std::string substitute_parameter(const std::string &str, int value);
     std::cerr << "test_substitute_parameter:\n";
 
@@ -67,15 +76,18 @@ std::string substitute_parameter(const std::string &str, int value);
 
         std::string actual = substitute_parameter(p.m_str, p.m_parameter);
         if (actual == p.m_expected) {
-            std::cerr << "pass\n";
+            std::cerr << PASS << "pass" << NEUTRAL << "\n";
         } else {
-            std::cerr << "FAIL (" << actual << " instead of " << p.m_expected << ")\n";
-            return 1;
+            std::cerr << FAIL << "FAIL (" << actual << " instead of "
+                << p.m_expected << ")" << NEUTRAL << "\n";
+            return false;
         }
     }
 
-    return 0;
+    return true;
 }
+
+// ------------------------------------------------------------------------------------------
 
 struct IsPathnameLocal {
     std::string m_str;
@@ -91,7 +103,7 @@ static std::vector<IsPathnameLocal> m_is_pathname_local = {
     { "/image.png", false },
 };
 
-static int test_is_pathname_local() {
+static bool test_is_pathname_local() {
     std::cerr << "test_is_pathname_local:\n";
 
     for (IsPathnameLocal &p : m_is_pathname_local) {
@@ -99,28 +111,129 @@ static int test_is_pathname_local() {
 
         bool actual = is_pathname_local(p.m_str);
         if (actual == p.m_expected) {
-            std::cerr << "pass\n";
+            std::cerr << PASS << "pass" << NEUTRAL << "\n";
         } else {
-            std::cerr << "FAIL\n";
-            return 1;
+            std::cerr << FAIL << "FAIL" << NEUTRAL << "\n";
+            return false;
         }
     }
 
-    return 0;
+    return true;
 }
 
-int start_unittests(const Parameters &parameters) {
-    int status = 0;
+// ------------------------------------------------------------------------------------------
 
-    status |= test_has_parameter();
-    status |= test_substitute_parameter();
-    status |= test_is_pathname_local();
+struct ParseEndpoint {
+    std::string m_endpoint;
+    std::string m_default_hostname;
+    int m_default_port;
+    bool m_success;
+    std::string m_hostname;
+    int m_port;
+};
 
-    if (status == 0) {
-        std::cout << "\nAll tests passed.\n";
-    } else {
-        std::cout << "\nTESTS FAILED.\n";
+static std::vector<ParseEndpoint> m_parse_endpoint = {
+    // Empty string is just defaults.
+    { "", "foo", 1120, true, "foo", 1120 },
+    // Can override hostname.
+    { "bar", "foo", 1120, true, "bar", 1120 },
+    // Can override port.
+    { "9999", "foo", 1120, true, "foo", 9999 },
+    // Can override both.
+    { "bar:9999", "foo", 1120, true, "bar", 9999 },
+    { ":9999", "foo", 1120, true, "", 9999 },
+    // Bad port.
+    { "bar:xyz", "foo", 1120, false, "", 0 },
+};
+
+static bool test_parse_endpoint() {
+    std::cerr << "test_parse_endpoint:\n";
+
+    for (ParseEndpoint &p : m_parse_endpoint) {
+        std::string hostname;
+        int port;
+
+        std::cerr << "    " << p.m_endpoint << ": ";
+
+        bool success = parse_endpoint(p.m_endpoint,
+                p.m_default_hostname, p.m_default_port,
+                hostname, port);
+        if (success != p.m_success ||
+                (success && (
+                             hostname != p.m_hostname ||
+                             port != p.m_port))) {
+
+            std::cerr << FAIL << "FAIL: " << success << " " << hostname << " "
+                << port << NEUTRAL << "\n";
+            return false;
+        } else {
+            std::cerr << PASS << "pass" << NEUTRAL << "\n";
+        }
     }
 
-    return status;
+    return true;
+}
+
+// ------------------------------------------------------------------------------------------
+
+struct DoDnsLookup {
+    std::string m_hostname;
+    int m_port;
+    bool m_is_server;
+    bool m_success;
+    uint32_t m_address;
+};
+
+static std::vector<DoDnsLookup> m_do_dns_lookup = {
+    { "localhost", 1120, false, true, 0x7F000001 },
+    { "teamten.com", 80, false, true, 0x17EF04EB },
+    { "", 80, false, true, 0x7F000001 },
+    { "", 80, true, true, INADDR_ANY },
+};
+
+static bool test_do_dns_lookup() {
+    std::cerr << "test_do_dns_lookup:\n";
+
+    for (DoDnsLookup &p : m_do_dns_lookup) {
+        std::cerr << "    " << p.m_hostname << ":" << p.m_port << ": ";
+
+        struct sockaddr_in sockaddr;
+        bool success = do_dns_lookup(p.m_hostname, p.m_port, p.m_is_server, sockaddr);
+
+        if (success != p.m_success ||
+                (success && (
+                             sockaddr.sin_port != htons(p.m_port) ||
+                             sockaddr.sin_addr.s_addr != htonl(p.m_address)))) {
+
+            std::cerr << FAIL << "FAIL: success:" << success <<
+                " " << std::hex << ntohl(sockaddr.sin_addr.s_addr) << std::dec <<
+                ":" << ntohs(sockaddr.sin_port) << NEUTRAL << "\n";
+
+            return false;
+        } else {
+            std::cerr << PASS << "pass" << NEUTRAL << "\n";
+        }
+    }
+
+    return true;
+}
+
+// ------------------------------------------------------------------------------------------
+
+int start_unittests(const Parameters &parameters) {
+    bool pass = true;
+
+    pass &= test_has_parameter();
+    pass &= test_substitute_parameter();
+    pass &= test_is_pathname_local();
+    pass &= test_parse_endpoint();
+    pass &= test_do_dns_lookup();
+
+    if (pass) {
+        std::cout << "\n" << PASS << "All tests passed." << NEUTRAL << "\n";
+    } else {
+        std::cout << "\n" << FAIL << "TESTS FAILED." << NEUTRAL << "\n";
+    }
+
+    return pass ? 0 : -1;
 }

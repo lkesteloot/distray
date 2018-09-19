@@ -7,7 +7,7 @@
 
 // Parse a number at s, moving it forward. Throws std::invalid_argument()
 // if no number can be parsed.
-int parse_int(const char *&s) {
+static int parse_int(const char *&s) {
     char *e;
 
     int value = strtol(s, &e, 10);
