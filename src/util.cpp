@@ -280,7 +280,7 @@ bool parse_endpoint(const std::string &endpoint,
                 port = possible_port;
             } else {
                 // Bad port, fail.
-                // XXX handle.
+                std::cerr << "Bad port " << (c + 1) << " in endpoint " << endpoint << "\n";
                 return false;
             }
         }
@@ -313,14 +313,14 @@ bool do_dns_lookup(const std::string &hostname, int port, bool is_server,
     struct addrinfo *res;
     int error = getaddrinfo(hostname_s, port_str.c_str(), &hints, &res);
     if (error != 0) {
-        // XXX Handle.
-        std::cerr << "DNS failed for " << hostname_s << ": " << gai_strerror(error) << "\n";
+        std::cerr << hostname_s << ": " << gai_strerror(error) << "\n";
         return false;
     }
 
     if (res == nullptr) {
-        // Failed to look up hostname.
-        // XXX handle. I don't know if this ever happens.
+        // Failed to look up hostname. I don't know if this ever happens.
+        std::cerr << "do_dns_lookup: Unexpected error in getaddrinfo() response for " <<
+            hostname_s << "\n";
         return false;
     }
 

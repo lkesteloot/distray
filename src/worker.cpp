@@ -111,7 +111,6 @@ int start_worker(Parameters &parameters) {
     // Resolve endpoint.
     bool success = parameters.m_endpoint.resolve(false, "", DEFAULT_WORKER_PORT);
     if (!success) {
-        // XXX Handle.
         return -1;
     }
 

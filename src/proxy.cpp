@@ -123,7 +123,6 @@ public:
         } else if (fd == m_controller_fd) {
             return m_w2c.send(fd);
         } else {
-            // XXX handle.
             std::cerr << "Fatal: Was passed fd " << fd << " that we don't know about.\n";
             exit(-1);
         }
@@ -137,7 +136,6 @@ public:
         } else if (fd == m_controller_fd) {
             return m_c2w.receive(fd);
         } else {
-            // XXX handle.
             std::cerr << "Fatal: Was passed fd " << fd << " that we don't know about.\n";
             exit(-1);
         }
@@ -235,12 +233,10 @@ int start_proxy(Parameters &parameters) {
     // Resolve endpoints.
     bool success = parameters.m_worker_endpoint.resolve(true, "", DEFAULT_WORKER_PORT);
     if (!success) {
-        // XXX Handle.
         return -1;
     }
     success = parameters.m_controller_endpoint.resolve(true, "", DEFAULT_CONTROLLER_PORT);
     if (!success) {
-        // XXX Handle.
         return -1;
     }
 
@@ -341,8 +337,8 @@ int start_proxy(Parameters &parameters) {
                     // Find the connection for this file descriptor.
                     Connection *connection = find(connections, fd, fd);
                     if (connection == nullptr) {
-                        // XXX handle.
-                        std::cerr << "Did not find incoming fd " << fd << "\n";
+                        // Programmer error.
+                        std::cerr << "Fatal: Did not find incoming fd " << fd << "\n";
                         exit(-1);
                     } else {
                         success = connection->receive(fd);
@@ -367,8 +363,8 @@ int start_proxy(Parameters &parameters) {
                     // Find the connection for this file descriptor.
                     Connection *connection = find(connections, fd, fd);
                     if (connection == nullptr) {
-                        // XXX handle.
-                        std::cerr << "Did not find outgoing fd " << fd << "\n";
+                        // Programmer error.
+                        std::cerr << "Fatal: Did not find outgoing fd " << fd << "\n";
                         exit(-1);
                     } else {
                         success = connection->send(fd);
@@ -385,8 +381,8 @@ int start_proxy(Parameters &parameters) {
                 if (i >= 2) {
                     Connection *connection = find(connections, fd, fd);
                     if (connection == nullptr) {
-                        // XXX handle.
-                        std::cerr << "Did not find dead fd " << fd << "\n";
+                        // Programmer error.
+                        std::cerr << "Fatal: Did not find dead fd " << fd << "\n";
                         exit(-1);
                     } else {
                         close_connection(connections, connection);

@@ -25,7 +25,7 @@ public:
         m_endpoint = endpoint;
     }
 
-    // Returns whether successful.
+    // Returns whether successful. If not successful, writes an error to standard error.
     bool resolve(bool is_server, const std::string &default_hostname, int default_port);
 };
 
@@ -56,19 +56,20 @@ int create_client_socket(const Endpoint &endpoint);
 
 // Parse a "hostname:port" string into a hostname and port. Also accepts
 // ":port" (blank hostname), "port" (default hostname), "hostname:" (default
-// port), and "hostname" (default port). Returns whether successful.
+// port), and "hostname" (default port). Returns whether successful. If not
+// successful, writes an error to standard error.
 bool parse_endpoint(const std::string &endpoint,
         const std::string &default_hostname, int default_port,
         std::string &hostname, int &port);
 
 // Do a DNS lookup on hostname/port combo. The hostname can be empty to
 // mean "any address" (is_server) or "localhost" (not is_server). Returns
-// whether successful.
+// whether successful. If not successful, writes an error to standard error.
 bool do_dns_lookup(const std::string &hostname, int port, bool is_server,
         struct sockaddr_in &sockaddr);
 
 // Combination of parse_endpoint() and do_dns_lookup(). Returns whether
-// successful.
+// successful. If not successful, writes an error to standard error.
 bool parse_and_lookup_endpoint(const std::string &endpoint,
         bool is_server,
         const std::string &default_hostname,

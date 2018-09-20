@@ -35,13 +35,11 @@ int start_controller(Parameters &parameters) {
     // Resolve endpoints.
     bool success = parameters.m_endpoint.resolve(true, "", DEFAULT_WORKER_PORT);
     if (!success) {
-        // XXX Handle.
         return -1;
     }
     for (Endpoint &endpoint : parameters.m_proxy_endpoints) {
         success = endpoint.resolve(false, "", DEFAULT_CONTROLLER_PORT);
         if (!success) {
-            // XXX Handle.
             return -1;
         }
     }
