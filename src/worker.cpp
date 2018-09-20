@@ -4,7 +4,7 @@
 #include <cstring>
 #include <errno.h>
 #include <netinet/in.h>
-#include <wait.h>
+#include <sys/wait.h>
 
 #include "worker.hpp"
 #include "Drp.pb.h"
