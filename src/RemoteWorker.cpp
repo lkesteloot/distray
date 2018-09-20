@@ -99,14 +99,17 @@ void RemoteWorker::dispatch() {
             }
 
             case SEND_COPY_OUT_NON_FRAME_FILE: {
+                // XXX implement.
                 break;
             }
 
             case RECEIVE_COPY_OUT_NON_FRAME_FILE: {
+                // XXX implement.
                 break;
             }
 
             case DONE: {
+                // XXX implement.
                 break;
             }
         }

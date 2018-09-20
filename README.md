@@ -1,8 +1,10 @@
 # Distray
 
-Distray is a distributed rendering system. It doesn't do the rendering itself,
-but runs any command-line renderer on a set of machines. It can also be used
-for non-rendering batch tasks.
+Distray (DISTributed RAY tracer) is a distributed rendering system. It doesn't
+do the rendering itself, but runs any command-line renderer on a set of
+machines. It can also be used for non-rendering batch tasks. The examples below
+use my [weekend ray tracer](https://github.com/lkesteloot/weekend-ray-tracer)
+for the name of the program to run.
 
 # Compiling
 
@@ -36,15 +38,18 @@ running a proxy, they can connect to it and control your workers.
 Use a password (specified with the `--password` flag) to limit who
 can connect to proxies or to the controller.
 
+In the usage below, `ENDPOINT` parameters are specified as `HOSTNAME:PORT`,
+or just `HOSTNAME` to use the default port. The default hostname is
+always localhost.
+
 ## Worker
 
 A worker launches the renderer itself. Run one worker on each machine
 you want to use.
 
-    % distray worker [FLAGS] HOST[:PORT]
+    % distray worker [FLAGS] ENDPOINT
 
-The `HOST` is the hostname of either a proxy or a controller.
-The `PORT` defaults to 1120.
+The ENDPOINT specifies to controller or proxy to connect to [:1120].
 
 Flags are:
 
@@ -63,13 +68,15 @@ some public machine that both have access to.
 
 Flags are:
 
-    --password PASSWORD Password to expect from workers or the controller.
-                        Defaults to an empty string.
+    --password PASSWORD           Password to expect from workers or the controller.
+                                  Defaults to an empty string.
+    --worker-listen ENDPOINT      ENDPOINT to listen for workers on [:1120]
+    --controller-listen ENDPOINT  ENDPOINT to listen for controllers on [:1121]
 
 ## Controller
 
 The controller tells the workers (optionally through the proxy) what
-files to render. The controller can take incoming connections from
+frames to render. The controller can take incoming connections from
 workers or make outgoing connections to proxies.
 
     % distray controller [FLAGS] FRAMES EXEC [PARAMETERS...]
@@ -88,11 +95,12 @@ a positive decimal integer that specifies field width.
 
 Flags are:
 
-    --proxy HOST        Proxy to connect to. Can be repeated.
+    --proxy ENDPOINT    Proxy to connect to [:1121]. Can be repeated.
     --in LOCAL REMOTE   Copy LOCAL file to REMOTE file. Can be repeated.
     --out REMOTE LOCAL  Copy REMOTE file to LOCAL file. Can be repeated.
     --password PASSWORD Password to expect from workers or to pass
                         to proxies. Defaults to an empty string.
+    --listen ENDPOINT   ENDPOINT to listen on [:1120].
 
 Local files can be anywhere in the file system, but remote files must be
 in the tree rooted at the current working directory of the worker. They
