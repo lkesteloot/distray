@@ -57,7 +57,7 @@ public:
 
 // Prints program usage to standard error.
 void Parameters::usage() const {
-    std::cerr << "Usage: distrend {worker,proxy,controller} [FLAGS] [ARGUMENTS]\n";
+    std::cerr << "Usage: distray {worker,proxy,controller} [FLAGS] [ARGUMENTS]\n";
     std::cerr << "\n";
     std::cerr << "Commands:\n";
     std::cerr << "\n";

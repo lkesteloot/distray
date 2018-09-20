@@ -1,6 +1,6 @@
-# Distrend
+# Distray
 
-Distrend is a distributed rendering system. It doesn't do the rendering itself,
+Distray is a distributed rendering system. It doesn't do the rendering itself,
 but runs any command-line renderer on a set of machines. It can also be used
 for non-rendering batch tasks.
 
@@ -10,7 +10,7 @@ You'll need the protobuf compiler and library:
 
     % sudo apt-get install protobuf-compiler libprotobuf-dev
 
-Build distrend using CMake:
+Build distray using CMake:
 
     % mkdir build
     % cd build
@@ -21,7 +21,7 @@ It compiles on MacOS and Linux.
 
 # Running
 
-Distrend can be run in one of three modes: worker, proxy, and controller.
+Distray can be run in one of three modes: worker, proxy, and controller.
 You must have one or more workers, zero or more proxies, and exactly
 one controller.
 
@@ -41,7 +41,7 @@ can connect to proxies or to the controller.
 A worker launches the renderer itself. Run one worker on each machine
 you want to use.
 
-    % distrend worker [FLAGS] HOST[:PORT]
+    % distray worker [FLAGS] HOST[:PORT]
 
 The `HOST` is the hostname of either a proxy or a controller.
 The `PORT` defaults to 1120.
@@ -59,7 +59,7 @@ For example, you may have some workers on AWS EC2 machines and the
 controller on a home machine, and it's easiest to run a proxy on
 some public machine that both have access to.
 
-    % distrend proxy [FLAGS]
+    % distray proxy [FLAGS]
 
 Flags are:
 
@@ -72,7 +72,7 @@ The controller tells the workers (optionally through the proxy) what
 files to render. The controller can take incoming connections from
 workers or make outgoing connections to proxies.
 
-    % distrend controller [FLAGS] FRAMES EXEC [PARAMETERS...]
+    % distray controller [FLAGS] FRAMES EXEC [PARAMETERS...]
 
 `FRAMES` is a frame range specification: `FIRST[,LAST[,STEP]]`,
 where `STEP` defaults to 1 or -1 (depending on order of `FIRST` and
@@ -114,22 +114,22 @@ The order of execution is:
 
 # Examples
 
-You can run distrend with and without a proxy.
+You can run distray with and without a proxy.
 
 ## With a proxy
 
 Generally you will run one proxy on a public machine (say `proxy.example.com`):
 
-    % distrend proxy
+    % distray proxy
 
 One worker per machine (including the proxy machine and the
 controller's machine):
 
-    % distrend worker proxy.example.com
+    % distray worker proxy.example.com
 
 And the controller on your home machine:
 
-    % distrend controller \
+    % distray controller \
         --proxy proxy.example.com \
         --in marbles.scene marbles.scene \
         --out anim/out-%03.png anim/out-%03.png \
@@ -142,11 +142,11 @@ You can skip the proxy if your controller's machine can be
 reached directly from all workers. Tell each worker
 the hostname of the controller:
 
-    % distrend worker controller.example.com
+    % distray worker controller.example.com
 
 And run the controller on that machine:
 
-    % distrend controller \
+    % distray controller \
         --in marbles.scene marbles.scene \
         --out anim/out-%03.png anim/out-%03.png \
         0,199 \
