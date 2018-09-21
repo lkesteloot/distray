@@ -1,7 +1,7 @@
 # Distray
 
-Distray (DISTributed RAY tracer) is a distributed rendering system. It doesn't
-do the rendering itself, but runs any command-line renderer on a set of
+Distray (DISTributed RAY tracer) is a distributed ray tracing system. It doesn't
+do the ray tracing itself, but runs any command-line renderer on a set of
 machines. It can also be used for non-rendering batch tasks. The examples below
 use my [weekend ray tracer](https://github.com/lkesteloot/weekend-ray-tracer)
 for the name of the program to run.
@@ -33,11 +33,6 @@ for security reasons. The executed binary must already have its
 executable bits set, and this cannot be done through the copying
 mechanism.
 
-By default there is no access control, and if anyone knows that you're
-running a proxy, they can connect to it and control your workers.
-Use a password (specified with the `--password` flag) to limit who
-can connect to proxies or to the controller.
-
 In the usage below, `ENDPOINT` parameters are specified as `HOSTNAME:PORT`,
 or just `HOSTNAME` to use the default port. The default hostname is
 always localhost.
@@ -47,14 +42,9 @@ always localhost.
 A worker launches the renderer itself. Run one worker on each machine
 you want to use.
 
-    % distray worker [FLAGS] ENDPOINT
+    % distray worker ENDPOINT
 
-The ENDPOINT specifies to controller or proxy to connect to [:1120].
-
-Flags are:
-
-    --password PASSWORD Password to pass to proxies or the controller.
-                        Defaults to an empty string.
+The `ENDPOINT` specifies the controller or proxy to connect to [:1120].
 
 ## Proxy
 
@@ -68,8 +58,6 @@ some public machine that both have access to.
 
 Flags are:
 
-    --password PASSWORD           Password to expect from workers or the controller.
-                                  Defaults to an empty string.
     --worker-listen ENDPOINT      ENDPOINT to listen for workers on [:1120]
     --controller-listen ENDPOINT  ENDPOINT to listen for controllers on [:1121]
 
@@ -98,8 +86,6 @@ Flags are:
     --proxy ENDPOINT    Proxy to connect to [:1121]. Can be repeated.
     --in LOCAL REMOTE   Copy LOCAL file to REMOTE file. Can be repeated.
     --out REMOTE LOCAL  Copy REMOTE file to LOCAL file. Can be repeated.
-    --password PASSWORD Password to expect from workers or to pass
-                        to proxies. Defaults to an empty string.
     --listen ENDPOINT   ENDPOINT to listen on [:1120].
 
 Local files can be anywhere in the file system, but remote files must be
@@ -140,7 +126,7 @@ And the controller on your home machine:
     % distray controller \
         --proxy proxy.example.com \
         --in marbles.scene marbles.scene \
-        --out anim/out-%03.png anim/out-%03.png \
+        --out anim/out-%03d.png anim/out-%03d.png \
         0,199 \
         build/ray %d anim/out 1000
 
@@ -156,7 +142,7 @@ And run the controller on that machine:
 
     % distray controller \
         --in marbles.scene marbles.scene \
-        --out anim/out-%03.png anim/out-%03.png \
+        --out anim/out-%03d.png anim/out-%03d.png \
         0,199 \
         build/ray %d anim/out 1000
 

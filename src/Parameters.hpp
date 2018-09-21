@@ -46,9 +46,6 @@ public:
     // Command we're running.
     Command m_command;
 
-    // For all commands.
-    std::string m_password;
-
     // For CMD_WORKER (outgoing) and CMD_CONTROLLER (incoming).
     Endpoint m_endpoint;
 

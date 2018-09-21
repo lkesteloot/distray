@@ -61,14 +61,10 @@ void Parameters::usage() const {
     std::cerr << "\n";
     std::cerr << "Commands:\n";
     std::cerr << "\n";
-    std::cerr << "    worker [FLAGS] ENDPOINT\n";
+    std::cerr << "    worker ENDPOINT\n";
     std::cerr << "        The ENDPOINT of either a proxy or a controller [:" << DEFAULT_WORKER_PORT << "].\n";
-    std::cerr << "        --password PASSWORD Password to pass to proxies or the controller.\n";
-    std::cerr << "                   Defaults to an empty string.\n";
     std::cerr << "\n";
     std::cerr << "    proxy [FLAGS]\n";
-    std::cerr << "        --password PASSWORD           Password to expect from workers or the\n";
-    std::cerr << "                                      controller. Defaults to an empty string.\n";
     std::cerr << "        --worker-listen ENDPOINT      ENDPOINT to listen for workers on [:"
         << DEFAULT_WORKER_PORT << "].\n";
     std::cerr << "        --controller-listen ENDPOINT  ENDPOINT to listen for controllers on [:"
@@ -86,8 +82,6 @@ void Parameters::usage() const {
         << DEFAULT_CONTROLLER_PORT << "]. Can be repeated.\n";
     std::cerr << "        --in LOCAL REMOTE   Copy LOCAL file to REMOTE file. Can be repeated.\n";
     std::cerr << "        --out REMOTE LOCAL  Copy REMOTE file to LOCAL file. Can be repeated.\n";
-    std::cerr << "        --password PASSWORD Password to expect from workers or to pass\n";
-    std::cerr << "                            to proxies. Defaults to an empty string.\n";
     std::cerr << "        --listen ENDPOINT   ENDPOINT to listen on [:"
         << DEFAULT_WORKER_PORT << "].\n";
     std::cerr << "\n";
@@ -129,15 +123,7 @@ int Parameters::parse_arguments(int argc, char *argv[]) {
     while (args.next_is_flag()) {
         arg = args.next();
 
-        if (arg == "--password") {
-            if (args.has_at_least(1)) {
-                // XXX handle password in all commands.
-                m_password = args.next();
-            } else {
-                std::cerr << "Must specify password with --password flag.\n";
-                return 1;
-            }
-        } else if (arg == "--proxy") {
+        if (arg == "--proxy") {
             if (m_command != CMD_CONTROLLER) {
                 std::cerr << "The --proxy flag is only valid with the controller command.\n";
                 return 1;
