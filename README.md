@@ -108,7 +108,7 @@ The order of execution is:
 
 # Examples
 
-You can run distray with and without a proxy.
+You can run distray with or without a proxy.
 
 ## With a proxy
 

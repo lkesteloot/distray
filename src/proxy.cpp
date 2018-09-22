@@ -53,10 +53,8 @@ public:
         }
 
         if (received == 0) {
-            // Other side closed connection.
-            // XXX handle.
-            // This isn't technically correct, but it'll be handled the same
-            // way higher up the stack.
+            // Other side closed connection. This error isn't technically
+            // correct, but it'll be handled the right way higher up the stack.
             errno = ECONNRESET;
             return false;
         }
@@ -187,6 +185,7 @@ static Connection *find(const std::vector<Connection *> &connections,
 
 // Write connection statistics to standard out.
 static void log_connections(const std::vector<Connection *> &connections) {
+    static int log_count = 0;
     int only_worker = 0;
     int only_controller = 0;
     int both = 0;
@@ -204,7 +203,11 @@ static void log_connections(const std::vector<Connection *> &connections) {
         }
     }
 
-    printf("%14d %14d %14d %14d\n", total, only_worker, only_controller, both);
+    if (log_count % 10 == 0) {
+        printf("%14s %14s %14s %14s\n", "workers", "controllers", "both", "total");
+    }
+    printf("%14d %14d %14d %14d\n", only_worker, only_controller, both, total);
+    log_count++;
 }
 
 // Close both sides of a connection and remove it from the collection.
@@ -257,7 +260,6 @@ int start_proxy(Parameters &parameters) {
     // Match up pairs as they come in.
     std::vector<Connection *> connections;
 
-    printf("%14s %14s %14s %14s\n", "total", "worker", "controller", "both");
     log_connections(connections);
 
     while (true) {

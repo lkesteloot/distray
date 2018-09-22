@@ -39,8 +39,13 @@ int receive_message(int sock_fd, google::protobuf::Message &response) {
     if (status == -1) {
         perror("recv1");
         return status;
+    } else if (status == 0) {
+        // Other side closed connection. This error isn't technically
+        // correct, but it'll be handled the right way higher up the stack.
+        errno = ECONNRESET;
+        return -1;
     } else if (status != sizeof(size)) {
-        // XXX handle 0, which means other side closed connection.
+        // Shouldn't happen, we specify MSG_WAITALL.
         std::cout << "Received " << status << " bytes instead of " << sizeof(size) << "\n";
         exit(-1);
     }
@@ -53,13 +58,22 @@ int receive_message(int sock_fd, google::protobuf::Message &response) {
     status = recv(sock_fd, buf, size, MSG_WAITALL);
     if (status == -1) {
         perror("recv2");
+    } else if (status == 0) {
+        // Other side closed connection. This error isn't technically
+        // correct, but it'll be handled the right way higher up the stack.
+        errno = ECONNRESET;
+        return -1;
     } else if (status != size) {
-        // XXX handle 0, which means other side closed connection.
+        // Shouldn't happen, we specify MSG_WAITALL.
         std::cout << "Received " << status << " bytes instead of " << size << "\n";
         exit(-1);
     } else {
-        // Decode. XXX check result code (a bool, undocumented).
-        response.ParseFromArray(buf, size);
+        // Decode. The result code is undocumented, we're guessing here.
+        bool success = response.ParseFromArray(buf, size);
+        if (!success) {
+            std::cerr << "Can't decode protobuf.\n";
+            exit(-1);
+        }
     }
 
     delete[] buf;

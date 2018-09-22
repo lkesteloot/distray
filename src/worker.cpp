@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include "worker.hpp"
 #include "Drp.pb.h"
@@ -23,6 +24,7 @@ static void handle_welcome(const Drp::WelcomeRequest &request, Drp::WelcomeRespo
 static void handle_copy_in(const Drp::CopyInRequest &request, Drp::CopyInResponse &response) {
     std::string pathname = request.pathname();
 
+    // Fail if it's not a local file.
     if (!is_pathname_local(pathname)) {
         // Shouldn't happen, we check this on the controller.
         std::cerr << "Asked to write to non-local pathname: " << pathname << "\n";
@@ -30,8 +32,30 @@ static void handle_copy_in(const Drp::CopyInRequest &request, Drp::CopyInRespons
         return;
     }
 
-    // XXX fail if file exists and is executable.
+    // Fail if file exists and is executable.
+    struct stat statbuf;
+    int result = stat(pathname.c_str(), &statbuf);
+    if (result == -1) {
+        if (errno == ENOENT) {
+            // No problem, file does not exist.
+        } else {
+            // Can't stat the file for some reason. Better fail.
+            std::cerr << "Can't stat file " << pathname << " (" << strerror(errno) << ")\n";
+            response.set_success(false);
+            return;
+        }
+    } else {
+        // File exists and we can stat it. Be sure it's not executable, or an
+        // attacker could replace an existing executable with their own, then
+        // execute it.
+        if ((statbuf.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH)) != 0) {
+            std::cerr << "Can't overwrite executable file " << pathname << "\n";
+            response.set_success(false);
+            return;
+        }
+    }
 
+    // Write the file contents.
     bool success = write_file(pathname, request.content());
     if (!success) {
         std::cerr << "Failed to write to file: " << pathname << "\n";
@@ -127,8 +151,14 @@ int start_worker(Parameters &parameters) {
 
         int result = receive_message(sockfd, request);
         if (result == -1) {
-            perror("receive_message_sock");
-            return -1;
+            if (errno == ECONNRESET) {
+                // Graceful shutdown.
+                std::cout << "Remote side closed connection.\n";
+                return 0;
+            } else {
+                perror("receive_message");
+                return -1;
+            }
         }
 
         // std::cout << "Received message " << request.request_type() << "\n";
@@ -162,7 +192,7 @@ int start_worker(Parameters &parameters) {
 
         result = send_message(sockfd, response);
         if (result == -1) {
-            perror("send_message_sock");
+            perror("send_message");
             return -1;
         }
     }

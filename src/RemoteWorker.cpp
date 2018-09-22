@@ -35,7 +35,10 @@ void RemoteWorker::dispatch() {
             case RECEIVE_COPY_IN_NON_FRAME_FILE: {
                 Drp::Response response;
                 receive_response(response, Drp::COPY_IN);
-                // XXX check copy status.
+                if (!response.copy_in_response().success()) {
+                    std::cerr << "Error: Failed to copy file.\n";
+                    exit(-1);
+                }
                 m_state_index++;
                 m_state = SEND_COPY_IN_NON_FRAME_FILE;
                 break;
@@ -55,7 +58,10 @@ void RemoteWorker::dispatch() {
             case RECEIVE_COPY_IN_FRAME_FILE: {
                 Drp::Response response;
                 receive_response(response, Drp::COPY_IN);
-                // XXX check copy status.
+                if (!response.copy_in_response().success()) {
+                    std::cerr << "Error: Failed to copy file.\n";
+                    exit(-1);
+                }
                 m_state_index++;
                 m_state = SEND_COPY_IN_FRAME_FILE;
                 break;
@@ -76,8 +82,11 @@ void RemoteWorker::dispatch() {
             case RECEIVE_EXECUTE_RESPONSE: {
                 Drp::Response response;
                 receive_response(response, Drp::EXECUTE);
-                // XXX check status.
-                // std::cout << "status: " << response.execute_response().status() << "\n";
+                int status = response.execute_response().status();
+                if (status != 0) {
+                    std::cerr << "Error: Failed to execute program (status " << status << ").\n";
+                    exit(-1);
+                }
                 m_state = SEND_COPY_OUT_FRAME_FILE;
                 m_state_index = 0;
                 break;
@@ -175,16 +184,14 @@ void RemoteWorker::handle_copy_file_out_response(const Drp::Response &response, 
         const FileCopy &fileCopy) {
 
     if (!response.copy_out_response().success()) {
-        // XXX handle.
-        std::cerr << "copy out success: " << response.copy_out_response().success() << "\n";
+        std::cerr << "Error: Failed to copy file.\n";
         exit(-1);
     }
 
     bool success = write_file(substitute_parameter(fileCopy.m_destination, frame),
             response.copy_out_response().content());
     if (!success) {
-        // XXX handle.
-        std::cerr << "Could not write local file " << fileCopy.m_destination << "\n";
+        std::cerr << "Error: Failed to copy file.\n";
         exit(-1);
     }
 }

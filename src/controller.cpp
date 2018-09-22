@@ -30,6 +30,23 @@ static bool any_worker_working(const std::vector<RemoteWorker *> &remote_workers
     return false;
 }
 
+// Remove the remote worker from our list.
+static void kill_worker(std::vector<RemoteWorker *> &remote_workers,
+        std::deque<int> &frames, int index) {
+
+    RemoteWorker *remote_worker = remote_workers[index];
+
+    int frame = remote_worker->get_frame();
+    std::cout << "Worker from " << remote_worker->hostname() <<
+        " working on frame " << frame << " is dead.\n";
+    if (frame >= 0) {
+        frames.push_front(frame);
+    }
+
+    remote_workers.erase(remote_workers.begin() + index);
+    delete remote_worker;
+}
+
 // Start the controller. Returns program exit code.
 int start_controller(Parameters &parameters) {
     // Resolve endpoints.
@@ -131,8 +148,13 @@ int start_controller(Parameters &parameters) {
                 } else {
                     success = remote_workers[i - 1]->receive();
                     if (!success) {
-                        perror("worker receive");
-                        return -1;
+                        if (errno == ECONNRESET) {
+                            // Other side disconnected.
+                            kill_worker(remote_workers, frames, i - 1);
+                        } else {
+                            perror("worker receive");
+                            return -1;
+                        }
                     }
                 }
             }
@@ -151,14 +173,7 @@ int start_controller(Parameters &parameters) {
             if ((revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
                 // Socket is dead, kill the worker.
                 if (i > 0) {
-                    int index = i - 1;
-                    RemoteWorker *remote_worker = remote_workers[index];
-                    int frame = remote_worker->get_frame();
-                    std::cout << "Worker from " << remote_worker->hostname() <<
-                        " working on frame " << frame << " is dead.\n";
-                    frames.push_front(frame);
-                    delete remote_workers[index];
-                    remote_workers.erase(remote_workers.begin() + index);
+                    kill_worker(remote_workers, frames, i - 1);
                 }
             }
         }

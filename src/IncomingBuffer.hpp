@@ -4,6 +4,9 @@
 #include <sys/socket.h>
 #include <google/protobuf/message.h>
 
+// Set a max for incoming file, to avoid bugs or attackers.
+static const int MAX_INCOMING_FILE_SIZE = 10*1024*1024;
+
 // Buffer that accumulates bytes until enough are ready to receive a message.
 class IncomingBuffer {
     // File descriptor we're receiving on.
@@ -63,8 +66,10 @@ public:
             if (received_here == -1) {
                 return false;
             } else if (received_here == 0) {
-                // XXX handle.
-                std::cerr << "IncomingBuffer got " << received_here << " instead of " << bytes_left << "\n";
+                // Other side closed connection. This error isn't technically
+                // correct, but it'll be handled the right way higher up the stack.
+                errno = ECONNRESET;
+                return false;
             }
 
             m_received += received_here;
@@ -80,7 +85,12 @@ public:
             m_received += received_here;
             if (m_received == sizeof(m_size)) {
                 m_size = ntohl(m_size);
-                // XXX Fail if size is too large (> 10 MB?).
+                if (m_size > MAX_INCOMING_FILE_SIZE) {
+                    // Fail if size is too large.
+                    std::cerr << "Refusing to receive file of " << m_size << " bytes.\n";
+                    // No good way to recover here, just exit.
+                    exit(-1);
+                }
                 m_have_size = true;
                 m_received = 0;
 
