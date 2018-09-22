@@ -2,9 +2,7 @@
 
 Distray (DISTributed RAY tracer) is a distributed ray tracing system. It doesn't
 do the ray tracing itself, but runs any command-line renderer on a set of
-machines. It can also be used for non-rendering batch tasks. The examples below
-use my [weekend ray tracer](https://github.com/lkesteloot/weekend-ray-tracer)
-for the name of the program to run.
+machines. It can also be used for non-rendering batch tasks.
 
 # Compiling
 
@@ -108,7 +106,9 @@ The order of execution is:
 
 # Examples
 
-You can run distray with or without a proxy.
+You can run distray with or without a proxy. The examples below use my
+[weekend ray tracer](https://github.com/lkesteloot/weekend-ray-tracer)
+for the name of the program to run.
 
 ## With a proxy
 
@@ -126,9 +126,9 @@ And the controller on your home machine:
     % distray controller \
         --proxy proxy.example.com \
         --in marbles.scene marbles.scene \
-        --out anim/out-%03d.png anim/out-%03d.png \
+        --out out-%03d.png out-%03d.png \
         0,199 \
-        build/ray %d anim/out 1000
+        build/src/ray/ray marble.scene %d out 1000
 
 ## Without a proxy
 
@@ -142,9 +142,9 @@ And run the controller on that machine:
 
     % distray controller \
         --in marbles.scene marbles.scene \
-        --out anim/out-%03d.png anim/out-%03d.png \
+        --out out-%03d.png out-%03d.png \
         0,199 \
-        build/ray %d anim/out 1000
+        build/src/ray/ray marble.scene %d out 1000
 
 # License
 
