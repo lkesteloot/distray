@@ -37,9 +37,11 @@ static void kill_worker(std::vector<RemoteWorker *> &remote_workers,
     RemoteWorker *remote_worker = remote_workers[index];
 
     int frame = remote_worker->get_frame();
-    std::cout << "Worker from " << remote_worker->hostname() <<
-        " working on frame " << frame << " is dead.\n";
-    if (frame >= 0) {
+    if (frame == -1) {
+        std::cout << "Warning: Pending connection disconnected. Proxy must have died.\n";
+    } else {
+        std::cout << "Worker from " << remote_worker->hostname() <<
+            " working on frame " << frame << " is dead.\n";
         frames.push_front(frame);
     }
 

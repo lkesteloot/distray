@@ -1,6 +1,7 @@
 
 #include <cstring>
 #include <vector>
+#include <set>
 #include <unistd.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -211,18 +212,33 @@ static void log_connections(const std::vector<Connection *> &connections) {
 }
 
 // Close both sides of a connection and remove it from the collection.
-static void close_connection(std::vector<Connection *> &connections, Connection *connection) {
+static void close_connection(std::vector<Connection *> &connections, Connection *connection,
+        std::set<int> &deleted_fds) {
+
+    // Keep track of these connections for later in the loop. It's okay if either
+    // of these is -1.
+    deleted_fds.insert(connection->get_worker_fd());
+    deleted_fds.insert(connection->get_controller_fd());
+
     // Shut down.
     connection->die();
 
     // Remove from the list.
+    bool found = false;
     for (std::vector<Connection *>::iterator itr = connections.begin();
             itr != connections.end(); ++itr) {
 
         if (connection == *itr) {
             connections.erase(itr);
+            found = true;
             break;
         }
+    }
+
+    if (!found) {
+        // Programmer error.
+        std::cerr << "Error: Connection not found.\n";
+        exit(-1);
     }
 
     delete connection;
@@ -286,10 +302,23 @@ int start_proxy(Parameters &parameters) {
             return -1;
         }
 
+        // We keep track of all the file descriptors of the connections that
+        // we closed. (For example, if there's a connection between A and B
+        // and A closes on us, we remove the Connection and add A and B to
+        // this set.) This is so we can ignore any event from either in the
+        // rest of the loop.
+        std::set<int> deleted_fds;
+
         for (int i = 0; i < pollfds.size(); i++) {
             int fd = pollfds[i].fd;
             short revents = pollfds[i].revents;
             bool skip_rest = false;
+
+            if (deleted_fds.find(fd) != deleted_fds.end()) {
+                // We closed this connection in an earlier iteration of this loop.
+                // Ignore it completely.
+                continue;
+            }
 
             // See if we can read from this file descriptor.
             if ((revents & POLLIN) != 0) {
@@ -347,7 +376,7 @@ int start_proxy(Parameters &parameters) {
                         if (!success) {
                             if (errno == ECONNRESET) {
                                 // Other side disconnected.
-                                close_connection(connections, connection);
+                                close_connection(connections, connection, deleted_fds);
                                 skip_rest = true;
                             } else {
                                 perror("connection receive");
@@ -387,7 +416,7 @@ int start_proxy(Parameters &parameters) {
                         std::cerr << "Fatal: Did not find dead fd " << fd << "\n";
                         exit(-1);
                     } else {
-                        close_connection(connections, connection);
+                        close_connection(connections, connection, deleted_fds);
                     }
                 }
             }
