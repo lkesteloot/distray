@@ -170,7 +170,7 @@ void RemoteWorker::copy_file_out(int frame, State receive_state, State next_stat
             std::string source_pathname = substitute_parameter(fileCopy.m_source, frame);
             std::string destination_pathname = substitute_parameter(fileCopy.m_destination, frame);
             std::cout << "Copying out " << source_pathname << " to " << destination_pathname << "\n";
-            copy_out_request->set_pathname(destination_pathname);
+            copy_out_request->set_pathname(source_pathname);
             send_request(request, receive_state);
         } else {
             m_state_index++;
